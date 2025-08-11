@@ -22,6 +22,8 @@ export class GameState {
         this.countdownStartTime = 0;
         this.lastBrickSpawn = 0;
         this.cachedAIColor = '#ff4488';
+        this.gameOverTime = 0;
+        this.gameOverAnimationProgress = 0;
     }
     
     startCountdown() {
@@ -39,6 +41,8 @@ export class GameState {
         this.running = false;
         this.over = true;
         this.playerWon = playerWon;
+        this.gameOverTime = Date.now();  // 게임 오버 시간 기록
+        this.gameOverAnimationProgress = 0;  // 애니메이션 진행도
     }
     
     canSpawnBricks() {
