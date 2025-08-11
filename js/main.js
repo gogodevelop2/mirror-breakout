@@ -452,7 +452,12 @@ class MirrorBreakout {
         const p2Count = this.bricks.player2.length;
 
         if(p1Count === 0 || p2Count === 0) {
-            this.gameState.setGameOver(p1Count === 0);
+            this.gameState.running = false;  // 게임만 멈춤
+            
+            // 0.5초 후에 게임 오버 화면 표시
+            setTimeout(() => {
+                this.gameState.setGameOver(p1Count === 0);
+            }, 500);
         }
     }
     
