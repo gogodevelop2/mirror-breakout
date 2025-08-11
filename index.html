@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror Breakout - Optimized</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            border: 2px solid #444;
+            border-radius: 22px;
+            background: #000;
+        }
+        h1 {
+            font-family: 'Orbitron', monospace;
+            font-weight: 900;
+            font-size: 42px;
+            background: linear-gradient(45deg, #4af, #f4a, #4af);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 0;
+            animation: gradientShift 3s ease infinite;
+        }
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: bold;
+            background: radial-gradient(circle, #5bf, #4af);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(68, 170, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button:hover {
+            background: radial-gradient(circle, #6cf, #5bf);
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(68, 170, 255, 0.6);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Mirror Breakout</h1>
+        <button onclick="toggleGame()">START</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 600;
+        canvas.height = 700;
+
+        // 게임 상수 (로컬 변수로 캐싱)
+        const CONFIG = {
+            BRICK_ROWS: 6,
+            BRICK_COLS: 10,
+            BRICK_WIDTH: 55,
+            BRICK_HEIGHT: 18,
+            BRICK_SPACING_X: 58,
+            BRICK_SPACING_Y: 21,
+            BALL_RADIUS: 8,
+            SPLIT_TIME: 10,
+            BRICK_SPAWN_INTERVAL: 10,
+            CORNER_RADIUS: 20,
+            MIN_ANGLE: 0.2,
+            PADDLE_MOMENTUM_TRANSFER: 0.3,
+            DIFFICULTY_UPDATE_INTERVAL: 2000,
+            BASE_AI_SPEED: 12,
+            BASE_AI_ACCEL: 0.6,
+            MIN_AI_MULTIPLIER: 0.6,
+            MAX_AI_MULTIPLIER: 2.0
+        };
+        
+        // 성능 최적화를 위한 상수 캐싱
+        const BRICK_ROWS = CONFIG.BRICK_ROWS;
+        const BRICK_COLS = CONFIG.BRICK_COLS;
+        const TOTAL_BRICKS = BRICK_ROWS * BRICK_COLS;
+
+        // 게임 상태
+        let game = {
+            running: false,
+            over: false,
+            playerWon: false,
+            startTime: 0,
+            time: 0,
+            ballSplitDone: false,
+            playerScore: 0,
+            computerScore: 0,
+            lastDifficultyUpdate: 0,
+            currentDifficultyMultiplier: 1.0,
+            countdown: 0,
+            countdownStartTime: 0,
+            lastBrickSpawn: 0,
+            cachedAIColor: '#ff4488' // AI 패들 색상 캐싱
+        };
+
+        // 그리드 맵 (빈 자리 탐색 최적화)
+        let brickGrid = {
+            player1: null,
+            player2: null
+        };
+
+        // 벡터 연산용 재사용 객체들
+        const tempVec1 = { x: 0, y: 0 };
+        const tempVec2 = { x: 0, y: 0 };
+        const tempVec3 = { x: 0, y: 0 };
+
+        // 패들
+        const createPaddle = (y, maxSpeed, accel, friction) => ({
+            x: 270, y,
+            width: 60,
+            height: 12,
+            speed: 0,
+            maxSpeed,
+            acceleration: accel,
+            friction,
+            prevX: 270,
+            baseMaxSpeed: maxSpeed,
+            baseAcceleration: accel
+        });
+
+        const paddle1 = createPaddle(320, 10, 0.8, 0.85);
+        const paddle2 = createPaddle(canvas.height - 332, CONFIG.BASE_AI_SPEED, CONFIG.BASE_AI_ACCEL, 0.9);
+
+        // 게임 엔티티
+        let balls = [];
+        let bricks = { player1: [], player2: [] };
+        let splitEffect = null;
+        let brickSpawnEffects = [];
+        const keys = {};
+
+        // 그리드 초기화
+        function initBrickGrid() {
+            brickGrid.player1 = Array(BRICK_ROWS).fill().map(() => Array(BRICK_COLS).fill(null));
+            brickGrid.player2 = Array(BRICK_ROWS).fill().map(() => Array(BRICK_COLS).fill(null));
+        }
+
+        // 벽돌 위치를 행/열로 변환
+        function getBrickGridPosition(brick, isPlayer1) {
+            const col = Math.round((brick.x - 15) / CONFIG.BRICK_SPACING_X);
+            let row;
+            if (isPlayer1) {
+                row = Math.round((brick.y - 40) / CONFIG.BRICK_SPACING_Y);
+            } else {
+                row = Math.round((canvas.height - brick.y - 58) / CONFIG.BRICK_SPACING_Y);
+            }
+            return { row, col };
+        }
+
+        // 그리드에 벽돌 등록
+        function addBrickToGrid(brick, isPlayer1) {
+            const { row, col } = getBrickGridPosition(brick, isPlayer1);
+            if (row >= 0 && row < BRICK_ROWS && col >= 0 && col < BRICK_COLS) {
+                const grid = isPlayer1 ? brickGrid.player1 : brickGrid.player2;
+                grid[row][col] = brick;
+            }
+        }
+
+        // 그리드에서 벽돌 제거
+        function removeBrickFromGrid(brick, isPlayer1) {
+            const { row, col } = getBrickGridPosition(brick, isPlayer1);
+            if (row >= 0 && row < BRICK_ROWS && col >= 0 && col < BRICK_COLS) {
+                const grid = isPlayer1 ? brickGrid.player1 : brickGrid.player2;
+                grid[row][col] = null;
+            }
+        }
+
+        // 벡터 유틸리티 함수들 (객체 재사용)
+        const vec = {
+            dot: (a, b) => a.x * b.x + a.y * b.y,
+            length: (v) => Math.sqrt(v.x * v.x + v.y * v.y),
+            normalize: (v, result) => {
+                const len = Math.sqrt(v.x * v.x + v.y * v.y);
+                if (len > 0) {
+                    result.x = v.x / len;
+                    result.y = v.y / len;
+                } else {
+                    result.x = 0;
+                    result.y = 0;
+                }
+                return result;
+            },
+            multiply: (v, scalar, result) => {
+                result.x = v.x * scalar;
+                result.y = v.y * scalar;
+                return result;
+            },
+            add: (a, b, result) => {
+                result.x = a.x + b.x;
+                result.y = a.y + b.y;
+                return result;
+            },
+            subtract: (a, b, result) => {
+                result.x = a.x - b.x;
+                result.y = a.y - b.y;
+                return result;
+            },
+            reflect: (incident, normal, result) => {
+                const dotProduct = vec.dot(incident, normal);
+                result.x = incident.x - normal.x * 2 * dotProduct;
+                result.y = incident.y - normal.y * 2 * dotProduct;
+                return result;
+            },
+            set: (target, x, y) => {
+                target.x = x;
+                target.y = y;
+                return target;
+            }
+        };
+
+        // 동적 난이도 조절 시스템
+        function updateDynamicDifficulty() {
+            const now = Date.now();
+            if (now - game.lastDifficultyUpdate < CONFIG.DIFFICULTY_UPDATE_INTERVAL) return;
+            
+            game.lastDifficultyUpdate = now;
+            
+            // 남은 벽돌 개수로 승부 상황 판단
+            const playerRemainingBricks = bricks.player1.length;
+            const computerRemainingBricks = bricks.player2.length;
+            
+            const brickDiff = computerRemainingBricks - playerRemainingBricks;
+            
+            let targetMultiplier = 1.0;
+            
+            if (brickDiff > 0) {
+                targetMultiplier = Math.min(CONFIG.MAX_AI_MULTIPLIER, 1.0 + (brickDiff * 0.08));
+            } else if (brickDiff < 0) {
+                targetMultiplier = Math.max(CONFIG.MIN_AI_MULTIPLIER, 1.0 + (brickDiff * 0.06));
+            }
+            
+            const oldMultiplier = game.currentDifficultyMultiplier;
+            game.currentDifficultyMultiplier = lerp(game.currentDifficultyMultiplier, targetMultiplier, 0.1);
+            
+            // 난이도가 변경된 경우에만 AI 색상 업데이트
+            if (Math.abs(oldMultiplier - game.currentDifficultyMultiplier) > 0.01) {
+                updateAIPaddleColor();
+            }
+            
+            paddle2.maxSpeed = CONFIG.BASE_AI_SPEED * game.currentDifficultyMultiplier;
+            paddle2.acceleration = CONFIG.BASE_AI_ACCEL * game.currentDifficultyMultiplier;
+        }
+
+        function lerp(start, end, factor) {
+            return start + (end - start) * factor;
+        }
+
+        // AI 패들 색상 캐싱 (난이도 변경시에만 계산)
+        function updateAIPaddleColor() {
+            const multiplier = game.currentDifficultyMultiplier;
+            
+            if (multiplier <= 0.6) {
+                game.cachedAIColor = '#4488ff';
+            } else if (multiplier <= 1.0) {
+                const t = (multiplier - 0.6) / 0.4;
+                const red = Math.round(68 + (255 - 68) * t);
+                const green = Math.round(136 * (1 - t * 0.5));
+                const blue = Math.round(255 - (255 - 136) * t);
+                game.cachedAIColor = `rgb(${red}, ${green}, ${blue})`;
+            } else if (multiplier <= 1.5) {
+                const t = (multiplier - 1.0) / 0.5;
+                const red = 255;
+                const green = Math.round(68 * (1 - t));
+                const blue = Math.round(136 * (1 - t));
+                game.cachedAIColor = `rgb(${red}, ${green}, ${blue})`;
+            } else {
+                const t = Math.min((multiplier - 1.5) / 0.5, 1);
+                const red = Math.round(255 - 55 * t);
+                const green = 0;
+                const blue = 0;
+                game.cachedAIColor = `rgb(${red}, ${green}, ${blue})`;
+            }
+        }
+
+        // 최적화된 빈 자리 탐색 (그리드 맵 사용)
+        function findEmptyPositions(isPlayer1) {
+            const emptyPositions = [];
+            const grid = isPlayer1 ? brickGrid.player1 : brickGrid.player2;
+            
+            for (let row = 0; row < BRICK_ROWS; row++) {
+                for (let col = 0; col < BRICK_COLS; col++) {
+                    if (grid[row][col] === null) {
+                        const x = col * CONFIG.BRICK_SPACING_X + 15;
+                        const y = isPlayer1
+                            ? row * CONFIG.BRICK_SPACING_Y + 40
+                            : canvas.height - (row * CONFIG.BRICK_SPACING_Y + 58);
+                        emptyPositions.push({ row, col, x, y });
+                    }
+                }
+            }
+            
+            return emptyPositions;
+        }
+
+        // 빈 자리에 새 벽돌 생성
+        function spawnNewBricks() {
+            if (game.time < CONFIG.BRICK_SPAWN_INTERVAL ||
+                Date.now() - game.lastBrickSpawn < CONFIG.BRICK_SPAWN_INTERVAL * 1000) return;
+            
+            game.lastBrickSpawn = Date.now();
+            
+            const emptyPositionsP1 = findEmptyPositions(true);
+            const emptyPositionsP2 = findEmptyPositions(false);
+            
+            if (emptyPositionsP1.length > 0) {
+                const randomPos = emptyPositionsP1[Math.floor(Math.random() * emptyPositionsP1.length)];
+                const newBrick = createSingleBrick(randomPos.row, randomPos.col, true);
+                bricks.player1.push(newBrick);
+                addBrickToGrid(newBrick, true);
+                
+                brickSpawnEffects.push({
+                    x: newBrick.x + newBrick.width / 2,
+                    y: newBrick.y + newBrick.height / 2,
+                    radius: 0,
+                    maxRadius: 30,
+                    opacity: 1,
+                    color: '#4488ff'
+                });
+            }
+            
+            if (emptyPositionsP2.length > 0) {
+                const randomPos = emptyPositionsP2[Math.floor(Math.random() * emptyPositionsP2.length)];
+                const newBrick = createSingleBrick(randomPos.row, randomPos.col, false);
+                bricks.player2.push(newBrick);
+                addBrickToGrid(newBrick, false);
+                
+                brickSpawnEffects.push({
+                    x: newBrick.x + newBrick.width / 2,
+                    y: newBrick.y + newBrick.height / 2,
+                    radius: 0,
+                    maxRadius: 30,
+                    opacity: 1,
+                    color: '#ff4488'
+                });
+            }
+        }
+        
+        // 단일 벽돌 생성
+        function createSingleBrick(row, col, isPlayer1) {
+            const baseHue = isPlayer1 ? 200 : 340;
+            const x = col * CONFIG.BRICK_SPACING_X + 15;
+            const y = isPlayer1
+                ? row * CONFIG.BRICK_SPACING_Y + 40
+                : canvas.height - (row * CONFIG.BRICK_SPACING_Y + 58);
+            
+            return {
+                x: x,
+                y: y,
+                width: CONFIG.BRICK_WIDTH,
+                height: CONFIG.BRICK_HEIGHT,
+                color: `hsl(${baseHue + row * 10}, 70%, 50%)`
+            };
+        }
+
+        // 랜덤 벽돌 패턴 생성
+        function generateRandomBrickPattern() {
+            const pattern = [];
+            
+            for (let row = 0; row < BRICK_ROWS; row++) {
+                for (let col = 0; col < BRICK_COLS; col++) {
+                    const hasBrick = Math.random() < 0.7;
+                    pattern.push(hasBrick);
+                }
+            }
+            
+            const minBricks = Math.floor(BRICK_ROWS * BRICK_COLS * 0.5);
+            const currentBricks = pattern.filter(Boolean).length;
+            
+            if (currentBricks < minBricks) {
+                const emptyPositions = pattern.map((hasBrick, index) => hasBrick ? -1 : index).filter(index => index !== -1);
+                const needToAdd = minBricks - currentBricks;
+                
+                for (let i = 0; i < needToAdd && emptyPositions.length > 0; i++) {
+                    const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+                    const position = emptyPositions.splice(randomIndex, 1)[0];
+                    pattern[position] = true;
+                }
+            }
+            
+            return pattern;
+        }
+
+        // 벽돌 생성 (그리드 맵과 함께)
+        function createBricks(isPlayer1, pattern) {
+            const baseHue = isPlayer1 ? 200 : 340;
+            const newBricks = [];
+            
+            for (let i = 0; i < BRICK_ROWS * BRICK_COLS; i++) {
+                if (!pattern[i]) continue;
+                
+                const row = Math.floor(i / BRICK_COLS);
+                const col = i % BRICK_COLS;
+                
+                const brick = {
+                    x: col * CONFIG.BRICK_SPACING_X + 15,
+                    y: isPlayer1
+                        ? row * CONFIG.BRICK_SPACING_Y + 40
+                        : canvas.height - (row * CONFIG.BRICK_SPACING_Y + 58),
+                    width: CONFIG.BRICK_WIDTH,
+                    height: CONFIG.BRICK_HEIGHT,
+                    color: `hsl(${baseHue + row * 10}, 70%, 50%)`
+                };
+                
+                newBricks.push(brick);
+                addBrickToGrid(brick, isPlayer1);
+            }
+            
+            return newBricks;
+        }
+
+        // 초기화 함수들
+        function initGame() {
+            initBrickGrid();
+            
+            const brickPattern = generateRandomBrickPattern();
+            
+            bricks.player1 = createBricks(true, brickPattern);
+            bricks.player2 = createBricks(false, brickPattern);
+            
+            balls = [
+                { x: 300, y: 280, dx: 3, dy: -4, radius: CONFIG.BALL_RADIUS },
+                { x: 300, y: 420, dx: -3, dy: 4, radius: CONFIG.BALL_RADIUS }
+            ];
+            splitEffect = null;
+            game.playerScore = 0;
+            game.computerScore = 0;
+            game.currentDifficultyMultiplier = 1.0;
+            game.lastDifficultyUpdate = 0;
+            game.countdownStartTime = 0;
+            game.lastBrickSpawn = 0;
+            
+            brickSpawnEffects = [];
+            
+            paddle2.maxSpeed = CONFIG.BASE_AI_SPEED;
+            paddle2.acceleration = CONFIG.BASE_AI_ACCEL;
+            updateAIPaddleColor(); // 초기 색상 설정
+        }
+
+        // 게임 제어
+        function toggleGame() {
+            if(game.running || game.over) {
+                resetGame();
+            } else {
+                startGame();
+            }
+        }
+
+        function startGame() {
+            initGame();
+            game = {
+                ...game,
+                running: false,
+                over: false,
+                playerWon: false,
+                startTime: 0,
+                time: 0,
+                ballSplitDone: false,
+                countdown: 3,
+                countdownStartTime: Date.now()
+            };
+            countdownLoop();
+        }
+
+        function resetGame() {
+            game.running = false;
+            game.over = false;
+            game.countdown = 0;
+            game.countdownStartTime = 0;
+            initGame();
+            game.time = 0;
+            drawGame();
+        }
+
+        // 카운트다운 루프
+        function countdownLoop() {
+            const elapsed = Date.now() - game.countdownStartTime;
+            const secondsElapsed = Math.floor(elapsed / 1000);
+            
+            if (secondsElapsed < 3) {
+                game.countdown = 3 - secondsElapsed;
+                drawGame();
+                requestAnimationFrame(countdownLoop);
+            } else if (secondsElapsed === 3) {
+                game.countdown = 0;
+                drawGame();
+                setTimeout(() => {
+                    game.running = true;
+                    game.startTime = Date.now();
+                    gameLoop();
+                }, 500);
+            }
+        }
+
+        // 게임 종료 체크 (최적화됨)
+        function checkGameEnd() {
+            if(!game.running) return;
+
+            const p1Count = bricks.player1.length;
+            const p2Count = bricks.player2.length;
+
+            if(p1Count === 0 || p2Count === 0) {
+                game.running = false;
+                game.over = true;
+                game.playerWon = p1Count === 0;
+            }
+        }
+
+        // 공 분열
+        function splitBall() {
+            if(game.ballSplitDone || game.time < CONFIG.SPLIT_TIME || balls.length === 0) return;
+
+            const p1Broken = TOTAL_BRICKS - bricks.player1.length;
+            const p2Broken = TOTAL_BRICKS - bricks.player2.length;
+            const winningPlayer = p1Broken > p2Broken ? 'player1' : 'player2';
+            
+            const targetBall = balls.find(ball =>
+                winningPlayer === 'player1' ? ball.y < canvas.height / 2 : ball.y > canvas.height / 2
+            ) || balls[0];
+            
+            if(targetBall) {
+                splitEffect = {
+                    x: targetBall.x,
+                    y: targetBall.y,
+                    radius: 0,
+                    opacity: 1,
+                    color: winningPlayer === 'player1' ? '#4488ff' : '#ff4488'
+                };
+                
+                balls.push({
+                    x: targetBall.x,
+                    y: targetBall.y,
+                    dx: -targetBall.dx * 1.2,
+                    dy: -targetBall.dy * 0.8,
+                    radius: CONFIG.BALL_RADIUS
+                });
+                game.ballSplitDone = true;
+            }
+        }
+
+        // 개선된 패들 충돌 처리 (벡터 객체 재사용)
+        function checkPaddleCollision(ball, paddle, isPlayer1) {
+            if((isPlayer1 && ball.dy <= 0) || (!isPlayer1 && ball.dy >= 0)) return false;
+            
+            const paddleRadius = paddle.height / 2;
+            const paddleVelocity = paddle.x - paddle.prevX;
+            
+            vec.set(tempVec1, paddle.x + paddleRadius, paddle.y + paddleRadius);
+            vec.set(tempVec2, paddle.x + paddle.width - paddleRadius, paddle.y + paddleRadius);
+            
+            let collisionPoint = null;
+            let normal = null;
+            let hitPaddle = false;
+
+            vec.set(tempVec3, ball.x, ball.y);
+            vec.subtract(tempVec3, tempVec1, tempVec3);
+            const leftDist = vec.length(tempVec3);
+            
+            if (leftDist <= ball.radius + paddleRadius) {
+                collisionPoint = tempVec1;
+                vec.normalize(tempVec3, tempVec3);
+                normal = tempVec3;
+                hitPaddle = true;
+            }
+            
+            if (!hitPaddle) {
+                vec.set(tempVec3, ball.x, ball.y);
+                vec.subtract(tempVec3, tempVec2, tempVec3);
+                const rightDist = vec.length(tempVec3);
+                
+                if (rightDist <= ball.radius + paddleRadius) {
+                    collisionPoint = tempVec2;
+                    vec.normalize(tempVec3, tempVec3);
+                    normal = tempVec3;
+                    hitPaddle = true;
+                }
+            }
+            
+            if (!hitPaddle) {
+                const ballEdge = ball.y + (isPlayer1 ? 1 : -1) * ball.radius;
+                const paddleEdge = isPlayer1 ? paddle.y : paddle.y + paddle.height;
+                
+                if (Math.abs(ballEdge - paddleEdge) <= 8 &&
+                    ball.x >= paddle.x + paddleRadius &&
+                    ball.x <= paddle.x + paddle.width - paddleRadius) {
+                    
+                    vec.set(tempVec1, ball.x, paddleEdge);
+                    collisionPoint = tempVec1;
+                    vec.set(tempVec3, 0, isPlayer1 ? -1 : 1);
+                    normal = tempVec3;
+                    hitPaddle = true;
+                    
+                    ball.y = isPlayer1 ? paddle.y - ball.radius : paddle.y + paddle.height + ball.radius;
+                }
+            }
+
+            if (hitPaddle) {
+                vec.set(tempVec1, ball.dx, ball.dy);
+                const speed = vec.length(tempVec1);
+                
+                vec.reflect(tempVec1, normal, tempVec2);
+                tempVec2.x += paddleVelocity * CONFIG.PADDLE_MOMENTUM_TRANSFER;
+                
+                const newSpeed = Math.max(speed * 0.95, 5);
+                vec.normalize(tempVec2, tempVec2);
+                
+                if (Math.abs(tempVec2.y) < CONFIG.MIN_ANGLE) {
+                    tempVec2.y = tempVec2.y > 0 ? CONFIG.MIN_ANGLE : -CONFIG.MIN_ANGLE;
+                    tempVec2.x = Math.sqrt(1 - tempVec2.y * tempVec2.y) * Math.sign(tempVec2.x);
+                }
+                
+                ball.dx = tempVec2.x * newSpeed;
+                ball.dy = tempVec2.y * newSpeed;
+                
+                return true;
+            }
+            
+            return false;
+        }
+
+        // AI 컨트롤
+        function updateAI() {
+            const targetBall = balls
+                .filter(ball => ball.dy < 0)
+                .sort((a, b) => Math.abs(a.y - paddle2.y) - Math.abs(b.y - paddle2.y))[0];
+
+            if(targetBall) {
+                const diff = targetBall.x - (paddle2.x + paddle2.width / 2);
+                const direction = Math.sign(diff);
+                
+                const reactionThreshold = 5 / game.currentDifficultyMultiplier;
+                
+                if(Math.abs(diff) > reactionThreshold) {
+                    paddle2.speed += direction * paddle2.acceleration;
+                    paddle2.speed = Math.max(-paddle2.maxSpeed, Math.min(paddle2.maxSpeed, paddle2.speed));
+                }
+            }
+            
+            paddle2.speed *= paddle2.friction;
+            paddle2.prevX = paddle2.x;
+            paddle2.x = Math.max(0, Math.min(canvas.width - paddle2.width, paddle2.x + paddle2.speed));
+        }
+
+        // 충돌 감지 (최적화됨 - 죽은 벽돌 실제 제거)
+        function checkCollisions() {
+            balls.forEach(ball => {
+                // 벽 충돌
+                if(ball.x < CONFIG.BALL_RADIUS || ball.x > canvas.width - CONFIG.BALL_RADIUS) {
+                    ball.dx = -ball.dx;
+                    ball.x = Math.max(CONFIG.BALL_RADIUS, Math.min(canvas.width - CONFIG.BALL_RADIUS, ball.x));
+                }
+                if(ball.y < CONFIG.BALL_RADIUS || ball.y > canvas.height - CONFIG.BALL_RADIUS) {
+                    ball.dy = ball.y < CONFIG.BALL_RADIUS ? Math.abs(ball.dy) : -Math.abs(ball.dy);
+                    ball.y = Math.max(CONFIG.BALL_RADIUS, Math.min(canvas.height - CONFIG.BALL_RADIUS, ball.y));
+                }
+
+                // 패들 충돌
+                checkPaddleCollision(ball, paddle1, true);
+                checkPaddleCollision(ball, paddle2, false);
+
+                // 벽돌 충돌 (배열에서 실제 제거)
+                [bricks.player1, bricks.player2].forEach((brickSet, index) => {
+                    for (let i = brickSet.length - 1; i >= 0; i--) {
+                        const brick = brickSet[i];
+                        if(ball.x > brick.x && ball.x < brick.x + brick.width &&
+                           ball.y - ball.radius < brick.y + brick.height &&
+                           ball.y + ball.radius > brick.y) {
+                            
+                            // 그리드에서 제거
+                            removeBrickFromGrid(brick, index === 0);
+                            
+                            // 배열에서 실제 제거
+                            brickSet.splice(i, 1);
+                            
+                            ball.dy = -ball.dy;
+                            
+                            // 점수 업데이트
+                            if (index === 0) {
+                                game.computerScore++;
+                            } else {
+                                game.playerScore++;
+                            }
+                            break; // 한 번에 하나의 벽돌만 처리
+                        }
+                    }
+                });
+            });
+        }
+
+        // 둥근 패들 그리기
+        function drawRoundedPaddle(paddle, color) {
+            const radius = paddle.height / 2;
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(paddle.x + radius, paddle.y + radius, radius, Math.PI * 0.5, Math.PI * 1.5);
+            ctx.lineTo(paddle.x + paddle.width - radius, paddle.y);
+            ctx.arc(paddle.x + paddle.width - radius, paddle.y + radius, radius, Math.PI * 1.5, Math.PI * 0.5);
+            ctx.fill();
+            
+            const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.height);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+
+        // 둥근 모서리 클리핑
+        function setupRoundedClip() {
+            ctx.save();
+            ctx.beginPath();
+            const r = CONFIG.CORNER_RADIUS;
+            ctx.moveTo(r, 0);
+            ctx.arcTo(canvas.width, 0, canvas.width, r, r);
+            ctx.arcTo(canvas.width, canvas.height, canvas.width - r, canvas.height, r);
+            ctx.arcTo(0, canvas.height, 0, canvas.height - r, r);
+            ctx.arcTo(0, 0, r, 0, r);
+            ctx.closePath();
+            ctx.clip();
+        }
+
+        // 게임 그리기 (최적화됨)
+        function drawGame() {
+            setupRoundedClip();
+
+            // 배경
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#001133');
+            gradient.addColorStop(0.5, '#000511');
+            gradient.addColorStop(1, '#110011');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 중앙 효과
+            const waveGradient = ctx.createLinearGradient(0, canvas.height/2 - 30, 0, canvas.height/2 + 30);
+            waveGradient.addColorStop(0, 'rgba(100, 200, 255, 0)');
+            waveGradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.1)');
+            waveGradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+            ctx.fillStyle = waveGradient;
+            ctx.fillRect(0, canvas.height/2 - 30, canvas.width, 60);
+
+            // 벽돌 (필터링 없이 직접 그리기)
+            bricks.player1.forEach(brick => {
+                ctx.fillStyle = brick.color;
+                ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+            });
+            
+            bricks.player2.forEach(brick => {
+                ctx.fillStyle = brick.color;
+                ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+            });
+
+            // 패들 (캐싱된 AI 색상 사용)
+            drawRoundedPaddle(paddle1, '#4488ff');
+            drawRoundedPaddle(paddle2, game.cachedAIColor);
+
+            // 공
+            balls.forEach(ball => {
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                
+                const glow = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, 20);
+                glow.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+                glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = glow;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 분열 효과
+            if(splitEffect) {
+                [1, 0.7, 1.3].forEach((scale, i) => {
+                    ctx.strokeStyle = splitEffect.color;
+                    ctx.lineWidth = 3 - i;
+                    ctx.globalAlpha = splitEffect.opacity * (1 - i * 0.3);
+                    ctx.beginPath();
+                    ctx.arc(splitEffect.x, splitEffect.y, splitEffect.radius * scale, 0, Math.PI * 2);
+                    ctx.stroke();
+                });
+                ctx.globalAlpha = 1;
+            }
+            
+            // 벽돌 스폰 효과
+            brickSpawnEffects.forEach(effect => {
+                ctx.strokeStyle = effect.color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = effect.opacity;
+                ctx.beginPath();
+                ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            });
+
+            // UI 텍스트
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = '#4488ff';
+            ctx.fillText('PLAYER (You)', 20, 30);
+            ctx.fillStyle = game.cachedAIColor;
+            ctx.fillText('COMPUTER', 20, canvas.height - 10);
+            
+            // 시간 표시
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#fff';
+            const minutes = Math.floor(game.time / 60);
+            const seconds = game.time % 60;
+            ctx.fillText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`, canvas.width - 100, 30);
+
+            // 카운트다운 표시
+            if(game.countdown > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.font = 'bold 120px Arial';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // 카운트다운 애니메이션 효과
+                const scale = Math.sin((Date.now() - game.countdownStartTime) % 1000 / 1000 * Math.PI) * 0.2 + 1;
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(scale, scale);
+                ctx.fillText(game.countdown.toString(), 0, 0);
+                ctx.restore();
+                
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+            
+            // START 표시
+            else if(game.countdown === 0 && !game.running && !game.over && game.countdownStartTime > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.font = 'bold 80px Arial';
+                ctx.fillStyle = '#4af';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const glow = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, 100);
+                glow.addColorStop(0, '#4af');
+                glow.addColorStop(1, 'rgba(68, 170, 255, 0.3)');
+                ctx.fillStyle = glow;
+                ctx.fillText('START!', canvas.width / 2, canvas.height / 2);
+                
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            // 게임 오버
+            if(game.over) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.font = 'bold 60px Arial';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+                
+                ctx.font = 'bold 36px Arial';
+                ctx.fillStyle = game.playerWon ? '#4af' : '#f44';
+                ctx.fillText(game.playerWon ? 'YOU WIN' : 'YOU LOSE', canvas.width / 2, canvas.height / 2 + 20);
+                
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            ctx.restore();
+        }
+
+        // 게임 루프 (최적화됨)
+        function gameLoop() {
+            if(game.running) {
+                game.time = Math.floor((Date.now() - game.startTime) / 1000);
+
+                // 동적 난이도 업데이트
+                updateDynamicDifficulty();
+                
+                // 새 벽돌 생성
+                spawnNewBricks();
+
+                // 플레이어 입력
+                paddle1.prevX = paddle1.x;
+                const direction = keys['ArrowLeft'] ? -1 : keys['ArrowRight'] ? 1 : 0;
+                if(direction) {
+                    paddle1.speed = Math.max(-paddle1.maxSpeed,
+                        Math.min(paddle1.maxSpeed, paddle1.speed + direction * paddle1.acceleration));
+                } else {
+                    paddle1.speed *= paddle1.friction;
+                    if(Math.abs(paddle1.speed) < 0.1) paddle1.speed = 0;
+                }
+                paddle1.x = Math.max(0, Math.min(canvas.width - paddle1.width, paddle1.x + paddle1.speed));
+
+                updateAI();
+
+                // 공 이동
+                balls.forEach(ball => {
+                    ball.x += ball.dx;
+                    ball.y += ball.dy;
+                });
+
+                checkCollisions();
+                splitBall();
+
+                // 분열 효과 업데이트
+                if(splitEffect) {
+                    splitEffect.radius += 5;
+                    splitEffect.opacity -= 0.02;
+                    if(splitEffect.opacity <= 0) splitEffect = null;
+                }
+                
+                // 벽돌 스폰 효과 업데이트 (필터링으로 제거)
+                brickSpawnEffects = brickSpawnEffects.filter(effect => {
+                    effect.radius += 2;
+                    effect.opacity -= 0.05;
+                    return effect.opacity > 0;
+                });
+
+                checkGameEnd();
+            }
+
+            drawGame();
+            
+            if(game.running) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // 이벤트 리스너
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        // 초기화
+        initGame();
+        drawGame();
+    </script>
+</body>
+</html>
