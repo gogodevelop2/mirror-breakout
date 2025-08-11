@@ -553,10 +553,7 @@ class MirrorBreakout {
         }
         
         if(this.gameState.over) {
-            const timeSinceGameOver = Date.now() - this.gameState.gameOverTime;
-            if(timeSinceGameOver >= 500) { // 0.5초 딜레이
-                this.renderer.drawGameOver(this.gameState.playerWon);
-            }
+            this.renderer.drawGameOver(this.gameState.playerWon);
         }
         
         this.renderer.restore();
