@@ -57,28 +57,29 @@ class GameScene extends Phaser.Scene {
     }
     
     createBackground() {
-        // 배경 그라데이션
+        // 간단한 배경 색상 설정
+        this.cameras.main.setBackgroundColor('#000511');
+        
+        // 그래픽 객체 생성
         const graphics = this.add.graphics();
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
         
-        // 상단 (플레이어 영역) - 파란색 계열
-        const gradientTop = graphics.createLinearGradient(0, 0, 0, this.cameras.main.height / 2);
-        gradientTop.addColorStop(0, '#001133');
-        gradientTop.addColorStop(1, '#000511');
+        // 상단 영역 (플레이어) - 약간 밝은 파란색 오버레이
+        graphics.fillStyle(0x001133, 0.5);
+        graphics.fillRect(0, 0, width, height / 2);
         
-        graphics.fillGradientStyle(gradientTop);
-        graphics.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height / 2);
-        
-        // 하단 (AI 영역) - 빨간색 계열
-        const gradientBottom = graphics.createLinearGradient(0, this.cameras.main.height / 2, 0, this.cameras.main.height);
-        gradientBottom.addColorStop(0, '#000511');
-        gradientBottom.addColorStop(1, '#110011');
-        
-        graphics.fillGradientStyle(gradientBottom);
-        graphics.fillRect(0, this.cameras.main.height / 2, this.cameras.main.width, this.cameras.main.height / 2);
+        // 하단 영역 (AI) - 약간 밝은 보라색 오버레이
+        graphics.fillStyle(0x110011, 0.5);
+        graphics.fillRect(0, height / 2, width, height / 2);
         
         // 중앙 라인 효과
-        graphics.fillStyle(0x4488ff, 0.1);
-        graphics.fillRect(0, this.cameras.main.height / 2 - 2, this.cameras.main.width, 4);
+        graphics.fillStyle(0x4488ff, 0.2);
+        graphics.fillRect(0, height / 2 - 2, width, 4);
+        
+        // 추가 장식 효과 (선택사항)
+        graphics.lineStyle(2, 0x4488ff, 0.3);
+        graphics.strokeRect(2, 2, width - 4, height - 4);
     }
     
     createPaddles() {
