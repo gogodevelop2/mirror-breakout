@@ -115,9 +115,11 @@ class GameScene extends Phaser.Scene {
         this.ball.setBounce(GAME_CONFIG.PHYSICS.BALL_BOUNCE);
         this.ball.body.allowGravity = false;
         
-        // 공에 글로우 효과 추가
+        // 공에 글로우 효과 추가 (Phaser 3.60+ 필요, 없으면 무시)
         this.ball.setScale(1);
-        this.ball.preFX.addGlow(0xffffff, 4, 0, false, 0.1, 10);
+        if (this.ball.preFX) {
+            this.ball.preFX.addGlow(0xffffff, 4, 0, false, 0.1, 10);
+        }
     }
     
     createBricks() {

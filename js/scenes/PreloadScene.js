@@ -110,7 +110,38 @@ class PreloadScene extends Phaser.Scene {
     }
     
     create() {
-        // 메인 게임 씬으로 전환
-        this.scene.start('GameScene');
+        // 동적으로 기본 텍스처 생성
+        this.createGameTextures();
+        
+        // 잠시 대기 후 메인 게임 씬으로 전환
+        this.time.delayedCall(100, () => {
+            this.scene.start('GameScene');
+        });
+    }
+    
+    createGameTextures() {
+        // 공 텍스처
+        const ballGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        ballGraphics.fillStyle(0xffffff, 1);
+        ballGraphics.fillCircle(8, 8, 8);
+        ballGraphics.generateTexture('ball', 16, 16);
+        ballGraphics.destroy();
+        
+        // 패들 텍스처 (플레이어)
+        const paddlePlayerGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        paddlePlayerGraphics.fillStyle(0x4488ff, 1);
+        paddlePlayerGraphics.fillRoundedRect(0, 0, 60, 12, 6);
+        paddlePlayerGraphics.generateTexture('paddlePlayer', 60, 12);
+        paddlePlayerGraphics.destroy();
+        
+        // 패들 텍스처 (AI)
+        const paddleAIGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        paddleAIGraphics.fillStyle(0xff4488, 1);
+        paddleAIGraphics.fillRoundedRect(0, 0, 60, 12, 6);
+        paddleAIGraphics.generateTexture('paddleAI', 60, 12);
+        paddleAIGraphics.destroy();
+        
+        // 벽돌 텍스처들 생성
+        this.createBrickTextures();
     }
 }
