@@ -28,10 +28,25 @@
     </div>
     
     <!-- 게임 스크립트 로드 순서 중요! -->
-    <script src="js/config/gameConfig.js" defer></script>
-    <script src="js/scenes/PreloadScene.js" defer></script>
-    <script src="js/scenes/GameScene.js" defer></script>
-    <script src="js/scenes/GameOverScene.js" defer></script>
-    <script src="js/main.js" defer></script>
+    <script src="js/config/gameConfig.js"></script>
+    
+    <!-- 유틸리티 -->
+    <script src="js/utils/VectorMath.js"></script>
+    
+    <!-- 엔티티 -->
+    <script src="js/entities/Ball.js"></script>
+    <script src="js/entities/Paddle.js"></script>
+    
+    <!-- 시스템 -->
+    <script src="js/systems/PhysicsSystem.js"></script>
+    <script src="js/systems/CollisionSystem.js"></script>
+    <script src="js/systems/AISystem.js"></script>
+    
+    <!-- 씬 -->
+    <script src="js/scenes/PreloadScene.js"></script>
+    <script src="js/scenes/GameScene.js"></script>
+    <script src="js/scenes/GameOverScene.js"></script>
+    
+    <script src="js/main.js"></script>
 </body>
 </html>
