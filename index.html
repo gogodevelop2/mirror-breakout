@@ -3,17 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mirror Breakout - Modular v2</title>
+    <title>Mirror Breakout - Phaser Edition</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Phaser 3 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 </head>
 <body>
-    <div class="header">
-        <h1>Mirror Breakout</h1>
-        <button id="toggleBtn">START</button>
+    <div class="game-container">
+        <header class="game-header">
+            <h1>Mirror Breakout</h1>
+            <div class="game-info">
+                <span id="score">Score: 0</span>
+                <span id="time">Time: 0:00</span>
+            </div>
+        </header>
+        
+        <!-- Phaser 게임이 렌더링될 컨테이너 -->
+        <div id="game-canvas"></div>
+        
+        <footer class="game-footer">
+            <p>Use ← → Arrow Keys to Move</p>
+        </footer>
     </div>
-    <canvas id="gameCanvas"></canvas>
     
-    <!-- 모듈화된 JavaScript 로드 -->
-    <script type="module" src="js/main.js"></script>
+    <!-- 게임 스크립트 로드 순서 중요! -->
+    <script src="js/config/gameConfig.js"></script>
+    <script src="js/scenes/PreloadScene.js"></script>
+    <script src="js/scenes/GameScene.js"></script>
+    <script src="js/scenes/GameOverScene.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
