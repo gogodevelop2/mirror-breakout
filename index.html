@@ -4,38 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mirror Breakout</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #111;
-            color: white;
-            font-family: 'Orbitron', monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-        
-        #game-container {
-            text-align: center;
-        }
-        
-        canvas {
-            border: 2px solid #444;
-            border-radius: 22px;
-            background: #000;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="game-canvas"></canvas>
+    <div class="header">
+        <h1>Mirror Breakout</h1>
+        <button id="toggleButton">START</button>
     </div>
     
+    <div id="game-container"></div>
+    
+    <!-- Phaser.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
-    <script type="module" src="src/main.js"></script>
+    
+    <!-- Game modules in dependency order -->
+    <script src="js/utils/VectorMath.js"></script>
+    <script src="js/config/gameConfig.js"></script>
+    <script src="js/entities/Ball.js"></script>
+    <script src="js/entities/Paddle.js"></script>
+    <script src="js/entities/Brick.js"></script>
+    <script src="js/systems/PhysicsSystem.js"></script>
+    <script src="js/systems/AISystem.js"></script>
+    <script src="js/systems/CollisionSystem.js"></script>
+    <script src="js/scenes/PreloadScene.js"></script>
+    <script src="js/scenes/GameScene.js"></script>
+    <script src="js/scenes/GameOverScene.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
