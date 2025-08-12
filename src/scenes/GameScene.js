@@ -1,11 +1,3 @@
-//
-//  GameScene.swift
-//  
-//
-//  Created by Joe Jeon on 2025/8/12.
-//
-
-
 // 메인 게임 씬
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -32,4 +24,17 @@ class GameScene extends Phaser.Scene {
         this.initializeSystems();
         
         // 게임 엔티티 생성
-        this.
+        this.createGameEntities();
+        
+        // UI 생성
+        this.createUI();
+        
+        // 이벤트 리스너 설정
+        this.setupEventListeners();
+        
+        // 입력 처리 설정
+        this.setupInput();
+        
+        // 게임 시작 카운트다운
+        this.startCountdown();
+    }
