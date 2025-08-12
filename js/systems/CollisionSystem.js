@@ -68,7 +68,7 @@ class CollisionSystem {
             );
         }
         
-        // 공-AI 패들 충돌  
+        // 공-AI 패들 충돌
         if (this.collisionGroups.balls && this.collisionGroups.aiPaddle) {
             physics.add.overlap(
                 this.collisionGroups.balls,
@@ -119,16 +119,16 @@ class CollisionSystem {
         if (this.physicsSystem) {
             switch (type) {
                 case 'ballPaddle':
-                    this.physicsSystem.handleBallPaddleCollision(objA, objB);
+                    // PhysicsSystem의 실제 메서드명 사용
+                    this.physicsSystem.onBallPaddleCollision(extra, objA, objB);
                     break;
                 case 'ballBrick':
-                    this.physicsSystem.handleBallBrickCollision(objA, objB);
+                    // PhysicsSystem의 실제 메서드명 사용
+                    this.physicsSystem.onBallBrickCollision(extra, objA, objB);
                     break;
                 case 'ballWorld':
-                    const ball = this.findBallByBody(extra.body || objA);
-                    if (ball) {
-                        this.physicsSystem.handleWorldBounce(ball, extra);
-                    }
+                    // 월드 바운더리는 다르게 처리
+                    this.physicsSystem.onWorldBoundsCollision(extra, objA);
                     break;
             }
         }
@@ -225,9 +225,9 @@ class CollisionSystem {
         [this.collisionGroups.playerPaddle, this.collisionGroups.aiPaddle].forEach(paddle => {
             if (paddle && paddle.active) {
                 graphics.strokeRect(
-                    paddle.x, 
-                    paddle.y, 
-                    paddle.paddleWidth, 
+                    paddle.x,
+                    paddle.y,
+                    paddle.paddleWidth,
                     paddle.paddleHeight
                 );
             }
@@ -256,11 +256,11 @@ class CollisionSystem {
         return {
             stats: { ...this.stats },
             activeGroups: {
-                balls: this.collisionGroups.balls ? 
+                balls: this.collisionGroups.balls ?
                     this.collisionGroups.balls.children.entries.length : 0,
-                playerBricks: this.collisionGroups.playerBricks ? 
+                playerBricks: this.collisionGroups.playerBricks ?
                     this.collisionGroups.playerBricks.children.entries.length : 0,
-                aiBricks: this.collisionGroups.aiBricks ? 
+                aiBricks: this.collisionGroups.aiBricks ?
                     this.collisionGroups.aiBricks.children.entries.length : 0
             }
         };

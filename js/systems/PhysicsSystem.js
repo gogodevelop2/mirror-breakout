@@ -43,16 +43,16 @@ class PhysicsSystem {
         // 공-패들 충돌 (커스텀 처리)
         if (this.balls && this.paddles.player) {
             this.scene.physics.add.overlap(
-                this.balls, 
-                this.paddles.player, 
+                this.balls,
+                this.paddles.player,
                 this.handleBallPaddleCollision.bind(this)
             );
         }
         
         if (this.balls && this.paddles.ai) {
             this.scene.physics.add.overlap(
-                this.balls, 
-                this.paddles.ai, 
+                this.balls,
+                this.paddles.ai,
                 this.handleBallPaddleCollision.bind(this)
             );
         }
@@ -60,16 +60,16 @@ class PhysicsSystem {
         // 공-벽돌 충돌
         if (this.balls && this.bricks.player) {
             this.scene.physics.add.overlap(
-                this.balls, 
-                this.bricks.player, 
+                this.balls,
+                this.bricks.player,
                 this.handleBallBrickCollision.bind(this)
             );
         }
         
         if (this.balls && this.bricks.ai) {
             this.scene.physics.add.overlap(
-                this.balls, 
-                this.bricks.ai, 
+                this.balls,
+                this.bricks.ai,
                 this.handleBallBrickCollision.bind(this)
             );
         }
@@ -98,7 +98,7 @@ class PhysicsSystem {
      */
     handleBallPaddleCollision(ball, paddle) {
         // 중복 충돌 방지
-        if (ball.lastPaddleCollision && 
+        if (ball.lastPaddleCollision &&
             this.scene.time.now - ball.lastPaddleCollision < 100) {
             return;
         }
@@ -129,7 +129,7 @@ class PhysicsSystem {
         
         // 패들 위치 (진동 효과 제외)
         const paddlePos = VectorMath.set(
-            this.tempVec2, 
+            this.tempVec2,
             paddle.x - (paddle.vibrationOffset?.x || 0),
             paddle.y - (paddle.vibrationOffset?.y || 0)
         );
@@ -186,7 +186,7 @@ class PhysicsSystem {
         }
         
         // 중앙 직사각형 영역 체크
-        if (ballPos.x >= rectArea.x && 
+        if (ballPos.x >= rectArea.x &&
             ballPos.x <= rectArea.x + rectArea.width) {
             
             const rectCenterY = rectArea.y + rectArea.height / 2;
@@ -194,7 +194,7 @@ class PhysicsSystem {
             
             if (distanceY <= ballRadius + rectArea.height / 2) {
                 const normal = VectorMath.create(
-                    0, 
+                    0,
                     ballPos.y < rectCenterY ? -1 : 1
                 );
                 
@@ -376,7 +376,7 @@ class PhysicsSystem {
         
         // 새 공 속도 설정 (각도 회전)
         const originalVelocity = VectorMath.create(
-            originalBall.body.velocity.x, 
+            originalBall.body.velocity.x,
             originalBall.body.velocity.y
         );
         const rotatedVelocity = VectorMath.rotate(originalVelocity, angle);
@@ -479,6 +479,45 @@ class PhysicsSystem {
         };
         
         this.vibrationSystem.reset();
+    }
+    
+    /**
+     * CollisionSystem에서 호출되는 인터페이스 메서드들
+     */
+    
+    /**
+     * 공-패들 충돌 처리 (CollisionSystem 인터페이스)
+     */
+    onBallPaddleCollision(paddleType, ball, paddle) {
+        return this.handleBallPaddleCollision(ball, paddle);
+    }
+    
+    /**
+     * 공-벽돌 충돌 처리 (CollisionSystem 인터페이스)
+     */
+    onBallBrickCollision(brickSide, ball, brick) {
+        return this.handleBallBrickCollision(ball, brick);
+    }
+    
+    /**
+     * 월드 경계 충돌 처리 (CollisionSystem 인터페이스)
+     */
+    onWorldBoundsCollision(event, body) {
+        const ball = this.findBallByBody(body);
+        if (ball) {
+            return this.handleWorldBounce(ball, event);
+        }
+        return false;
+    }
+    
+    /**
+     * Body로 공 찾기
+     */
+    findBallByBody(body) {
+        if (this.balls && this.balls.children) {
+            return this.balls.children.entries.find(b => b.body === body);
+        }
+        return null;
     }
     
     /**
@@ -600,7 +639,7 @@ class VibrationSystem {
         
         // 화면 변형 적용
         if (this.gameContainer) {
-            this.gameContainer.style.transform = 
+            this.gameContainer.style.transform =
                 `translate(${totalOffsetX}px, ${totalOffsetY}px)`;
         }
     }

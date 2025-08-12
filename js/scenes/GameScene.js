@@ -45,6 +45,18 @@ class GameScene extends Phaser.Scene {
             ui: null
         };
         
+        // UI 요소들
+        this.uiElements = {
+            playerLabel: null,
+            aiLabel: null,
+            timeLabel: null
+        };
+        
+        // 오버레이들
+        this.countdownOverlay = null;
+        this.gameOverOverlay = null;
+        this.countdownText = null;
+        
         // 입력 처리
         this.controls = {
             leftKey: null,
@@ -174,11 +186,30 @@ class GameScene extends Phaser.Scene {
      * UI 생성
      */
     createUI() {
-        this.graphics.ui = this.add.graphics();
-        this.graphics.ui.setDepth(100);
+        // UI 텍스트 객체들 생성 (한 번만)
+        this.uiElements = {
+            playerLabel: this.add.text(20, 30, 'PLAYER (You)', {
+                fontSize: '20px',
+                fontWeight: 'bold',
+                fill: '#4488ff'
+            }),
+            
+            aiLabel: this.add.text(20, GameConfig.CANVAS.HEIGHT - 10, 'COMPUTER', {
+                fontSize: '20px',
+                fontWeight: 'bold',
+                fill: '#ff4488'
+            }),
+            
+            timeLabel: this.add.text(GameConfig.CANVAS.WIDTH - 100, 30, 'Time: 0:00', {
+                fontSize: '16px',
+                fill: '#ffffff'
+            })
+        };
         
-        // UI 텍스트들은 나중에 updateUI()에서 그리기
-        this.updateUI();
+        // 깊이 설정
+        Object.values(this.uiElements).forEach(element => {
+            element.setDepth(100);
+        });
     }
     
     /**
@@ -267,10 +298,10 @@ class GameScene extends Phaser.Scene {
      * 벽돌 그리드 초기화
      */
     initBrickGrid() {
-        this.brickGrid.player = Array(GameConfig.BRICK.ROWS).fill().map(() => 
+        this.brickGrid.player = Array(GameConfig.BRICK.ROWS).fill().map(() =>
             Array(GameConfig.BRICK.COLS).fill(null)
         );
-        this.brickGrid.ai = Array(GameConfig.BRICK.ROWS).fill().map(() => 
+        this.brickGrid.ai = Array(GameConfig.BRICK.ROWS).fill().map(() =>
             Array(GameConfig.BRICK.COLS).fill(null)
         );
     }
@@ -570,7 +601,7 @@ class GameScene extends Phaser.Scene {
      * 공 분열 체크 및 실행
      */
     checkAndExecuteBallSplit() {
-        if (this.gameState.ballSplitDone || 
+        if (this.gameState.ballSplitDone ||
             this.gameState.currentTime < GameConfig.BALL.SPLIT_TIME / 1000) {
             return;
         }
@@ -700,86 +731,126 @@ class GameScene extends Phaser.Scene {
      * UI 업데이트
      */
     updateUI() {
-        if (!this.graphics.ui) return;
+        // 시간 업데이트
+        if (this.uiElements && this.uiElements.timeLabel) {
+            const minutes = Math.floor(this.gameState.currentTime / 60);
+            const seconds = this.gameState.currentTime % 60;
+            this.uiElements.timeLabel.setText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+        }
         
-        this.graphics.ui.clear();
+        // AI 색상 업데이트
+        if (this.uiElements && this.uiElements.aiLabel && this.entities.aiPaddle) {
+            const aiColor = `#${this.entities.aiPaddle.currentColor.toString(16).padStart(6, '0')}`;
+            this.uiElements.aiLabel.setColor(aiColor);
+        }
         
+        // 카운트다운 오버레이
+        this.updateCountdownOverlay();
+        
+        // 게임 오버 오버레이
+        this.updateGameOverOverlay();
+    }
+    
+    /**
+     * 카운트다운 오버레이 업데이트
+     */
+    updateCountdownOverlay() {
+        if (this.gameState.countdown > 0) {
+            if (!this.countdownOverlay) {
+                this.createCountdownOverlay();
+            }
+            this.updateCountdownDisplay();
+        } else if (this.countdownOverlay) {
+            this.countdownOverlay.destroy();
+            this.countdownOverlay = null;
+        }
+    }
+    
+    /**
+     * 카운트다운 오버레이 생성
+     */
+    createCountdownOverlay() {
         const width = GameConfig.CANVAS.WIDTH;
         const height = GameConfig.CANVAS.HEIGHT;
         
-        // 플레이어 라벨
-        this.graphics.ui.fillStyle(GameConfig.COLORS.PLAYER);
-        this.graphics.ui.text = this.add.text(20, 30, 'PLAYER (You)', {
-            fontSize: '20px',
+        this.countdownOverlay = this.add.container(0, 0);
+        this.countdownOverlay.setDepth(200);
+        
+        // 반투명 배경
+        const overlay = this.add.graphics();
+        overlay.fillStyle(0x000000, 0.8);
+        overlay.fillRect(0, 0, width, height);
+        
+        // 카운트다운 텍스트
+        this.countdownText = this.add.text(width / 2, height / 2, '', {
+            fontSize: '120px',
             fontWeight: 'bold',
-            fill: '#4488ff'
+            fill: '#ffffff',
+            align: 'center'
         });
+        this.countdownText.setOrigin(0.5, 0.5);
         
-        // AI 라벨 (난이도에 따른 색상)
-        const aiColor = this.systems.ai ? 
-            this.entities.aiPaddle.currentColor : 
-            GameConfig.COLORS.AI_MIN;
+        this.countdownOverlay.add([overlay, this.countdownText]);
+    }
+    
+    /**
+     * 카운트다운 표시 업데이트
+     */
+    updateCountdownDisplay() {
+        if (this.countdownText) {
+            this.countdownText.setText(this.gameState.countdown.toString());
             
-        this.add.text(20, height - 10, 'COMPUTER', {
-            fontSize: '20px',
-            fontWeight: 'bold',
-            fill: `#${aiColor.toString(16).padStart(6, '0')}`
-        });
-        
-        // 시간 표시
-        const minutes = Math.floor(this.gameState.currentTime / 60);
-        const seconds = this.gameState.currentTime % 60;
-        this.add.text(width - 100, 30, `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`, {
-            fontSize: '16px',
-            fill: '#ffffff'
-        });
-        
-        // 카운트다운 표시
-        if (this.gameState.countdown > 0) {
-            // 반투명 오버레이
-            this.graphics.ui.fillStyle(0x000000, 0.8);
-            this.graphics.ui.fillRect(0, 0, width, height);
-            
-            // 카운트다운 숫자
-            const countdownText = this.add.text(width / 2, height / 2, this.gameState.countdown.toString(), {
-                fontSize: '120px',
-                fontWeight: 'bold',
-                fill: '#ffffff',
-                align: 'center'
-            });
-            countdownText.setOrigin(0.5, 0.5);
-            
-            // 애니메이션 효과
+            // 펄스 효과
             const elapsed = Date.now() - this.gameState.countdownStartTime;
             const scale = Math.sin(elapsed % 1000 / 1000 * Math.PI) * 0.2 + 1;
-            countdownText.setScale(scale);
+            this.countdownText.setScale(scale);
         }
+    }
+    
+    /**
+     * 게임 오버 오버레이 업데이트
+     */
+    updateGameOverOverlay() {
+        if (this.gameState.over && !this.gameOverOverlay) {
+            this.createGameOverOverlay();
+        }
+    }
+    
+    /**
+     * 게임 오버 오버레이 생성
+     */
+    createGameOverOverlay() {
+        const width = GameConfig.CANVAS.WIDTH;
+        const height = GameConfig.CANVAS.HEIGHT;
         
-        // 게임 오버 표시
-        if (this.gameState.over) {
-            // 반투명 오버레이
-            this.graphics.ui.fillStyle(0x000000, 0.7);
-            this.graphics.ui.fillRect(0, 0, width, height);
-            
-            // 게임 오버 텍스트
-            const gameOverText = this.add.text(width / 2, height / 2 - 40, 'GAME OVER', {
-                fontSize: '60px',
-                fontWeight: 'bold',
-                fill: '#ffffff',
-                align: 'center'
-            });
-            gameOverText.setOrigin(0.5, 0.5);
-            
-            // 승패 텍스트
-            const resultText = this.add.text(width / 2, height / 2 + 20, 
-                this.gameState.playerWon ? 'YOU WIN' : 'YOU LOSE', {
-                fontSize: '36px',
-                fontWeight: 'bold',
-                fill: this.gameState.playerWon ? '#4af' : '#f44',
-                align: 'center'
-            });
-            resultText.setOrigin(0.5, 0.5);
-        }
+        this.gameOverOverlay = this.add.container(0, 0);
+        this.gameOverOverlay.setDepth(200);
+        
+        // 반투명 배경
+        const overlay = this.add.graphics();
+        overlay.fillStyle(0x000000, 0.7);
+        overlay.fillRect(0, 0, width, height);
+        
+        // 게임 오버 텍스트
+        const gameOverText = this.add.text(width / 2, height / 2 - 40, 'GAME OVER', {
+            fontSize: '60px',
+            fontWeight: 'bold',
+            fill: '#ffffff',
+            align: 'center'
+        });
+        gameOverText.setOrigin(0.5, 0.5);
+        
+        // 승패 텍스트
+        const resultText = this.add.text(width / 2, height / 2 + 20,
+            this.gameState.playerWon ? 'YOU WIN' : 'YOU LOSE', {
+            fontSize: '36px',
+            fontWeight: 'bold',
+            fill: this.gameState.playerWon ? '#4af' : '#f44',
+            align: 'center'
+        });
+        resultText.setOrigin(0.5, 0.5);
+        
+        this.gameOverOverlay.add([overlay, gameOverText, resultText]);
     }
     
     /**
@@ -835,6 +906,17 @@ class GameScene extends Phaser.Scene {
      * 씬 종료
      */
     shutdown() {
+        // 오버레이 정리
+        if (this.countdownOverlay) {
+            this.countdownOverlay.destroy();
+            this.countdownOverlay = null;
+        }
+        
+        if (this.gameOverOverlay) {
+            this.gameOverOverlay.destroy();
+            this.gameOverOverlay = null;
+        }
+        
         // 이벤트 리스너 정리
         this.events.off('restartGame');
         this.events.off('stopGame');
