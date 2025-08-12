@@ -1,327 +1,151 @@
-// 물리 엔진 관리 시스템
-class PhysicsManager {
+export class PhysicsManager {
     constructor(scene) {
         this.scene = scene;
-        this.config = GameConfig.gameplay;
-        this.physicsConfig = GameConfig.physics;
+        this.config = scene.game.config.game;
         
-        this.init();
+        this.setupPhysics();
     }
 
-    init() {
-        // Matter.js 물리 월드 설정
-        this.setupPhysicsWorld();
+    setupPhysics() {
+        // Matter.js 물리 세계 설정
+        this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height, 32, true, true, false, true);
         
-        // 충돌 카테고리 정의
-        this.setupCollisionCategories();
-        
-        // 충돌 이벤트 리스너 설정
-        this.setupCollisionEvents();
-    }
-
-    setupPhysicsWorld() {
-        const { width, height } = this.scene.sys.game.config;
-        
-        // 월드 경계 설정 (벽 생성하지 않음 - 수동으로 처리)
-        this.scene.matter.world.setBounds(0, 0, width, height, 32, false);
-        
-        // 중력 제거 (브레이크아웃은 중력 없는 환경)
+        // 중력 제거 (공이 자유롭게 움직이도록)
         this.scene.matter.world.setGravity(0, 0);
         
-        // 물리 월드 업데이트 빈도 설정
-        this.scene.matter.world.runner.fps = 60;
-        this.scene.matter.world.runner.isFixed = true;
+        // 물리 업데이트 빈도 설정
+        this.scene.matter.world.runner.delta = 1000 / 60; // 60 FPS
     }
 
-    setupCollisionCategories() {
-        // 충돌 카테고리 비트마스크 정의
-        this.categories = {
-            BALL: 0x0001,
-            PADDLE_PLAYER: 0x0002,
-            PADDLE_AI: 0x0004,
-            BRICK_PLAYER: 0x0008,
-            BRICK_AI: 0x0010,
-            WALL: 0x0020
-        };
-    }
-
-    setupCollisionEvents() {
-        // 충돌 감지 이벤트
-        this.scene.matter.world.on('collisionstart', (event) => {
-            this.handleCollisionStart(event);
+    createBallBody(x, y, radius) {
+        // 공 물리 바디 생성
+        const ball = this.scene.matter.add.circle(x, y, radius, {
+            restitution: 1.0,      // 완전 탄성 충돌
+            friction: 0,           // 마찰 없음
+            frictionAir: 0,        // 공기 저항 없음
+            density: 0.001,        // 가벼운 밀도
+            inertia: Infinity,     // 회전 방지
+            label: 'ball'
         });
-
-        this.scene.matter.world.on('collisionend', (event) => {
-            this.handleCollisionEnd(event);
-        });
+        
+        return ball;
     }
 
-    // 공 생성
-    createBall(x, y, options = {}) {
-        const ballConfig = this.config.ball;
+    createPaddleBody(x, y, width, height) {
+        // 패들 물리 바디 생성 (둥근 모서리)
+        const paddleRadius = height / 2;
         
-        const defaultOptions = {
-            restitution: ballConfig.restitution,
-            friction: ballConfig.friction,
-            frictionAir: ballConfig.frictionAir,
-            density: 0.001,
-            collisionFilter: {
-                category: this.categories.BALL,
-                mask: this.categories.PADDLE_PLAYER | 
-                      this.categories.PADDLE_AI | 
-                      this.categories.BRICK_PLAYER | 
-                      this.categories.BRICK_AI | 
-                      this.categories.WALL
-            }
-        };
-
-        const mergedOptions = { ...defaultOptions, ...options };
-        
-        // Matter.js 원형 바디 생성
-        const ballBody = this.scene.matter.add.circle(x, y, ballConfig.radius, mergedOptions);
-        
-        // 초기 속도 설정
-        const angle = options.angle || (Math.random() * Math.PI * 2);
-        const speed = options.speed || ballConfig.speed;
-        
-        this.scene.matter.setVelocity(ballBody, 
-            Math.cos(angle) * speed, 
-            Math.sin(angle) * speed
+        // 복합 바디 생성 (중앙 사각형 + 양쪽 원)
+        const centerRect = this.scene.matter.add.rectangle(
+            x + width / 2, y + height / 2,
+            width - height, height,
+            { isStatic: true, label: 'paddle' }
         );
-
-        return ballBody;
+        
+        const leftCircle = this.scene.matter.add.circle(
+            x + paddleRadius, y + paddleRadius,
+            paddleRadius,
+            { isStatic: true, label: 'paddle' }
+        );
+        
+        const rightCircle = this.scene.matter.add.circle(
+            x + width - paddleRadius, y + paddleRadius,
+            paddleRadius,
+            { isStatic: true, label: 'paddle' }
+        );
+        
+        // 복합 바디로 결합
+        const paddle = this.scene.matter.add.constraint(centerRect, leftCircle, 0, 1);
+        this.scene.matter.add.constraint(centerRect, rightCircle, 0, 1);
+        
+        return { centerRect, leftCircle, rightCircle };
     }
 
-    // 패들 생성 (둥근 모서리 적용)
-    createPaddle(x, y, isPlayer = true, options = {}) {
-        const paddleConfig = this.config.paddle;
-        const category = isPlayer ? this.categories.PADDLE_PLAYER : this.categories.PADDLE_AI;
-        
-        // 둥근 패들을 위한 복합 바디 생성
-        const radius = paddleConfig.height / 2;
-        const centerWidth = paddleConfig.width - (radius * 2);
-        
-        // 중앙 직사각형 + 양쪽 원형 엔드캡
-        const parts = [
-            // 중앙 직사각형
-            this.scene.matter.bodies.rectangle(x, y, centerWidth, paddleConfig.height),
-            // 왼쪽 원형
-            this.scene.matter.bodies.circle(x - centerWidth/2, y, radius),
-            // 오른쪽 원형
-            this.scene.matter.bodies.circle(x + centerWidth/2, y, radius)
-        ];
-
-        const paddleBody = this.scene.matter.body.create({
-            parts: parts,
-            isStatic: false,
-            frictionAir: 0.01,
-            friction: 0.8,
-            restitution: 0.8,
-            collisionFilter: {
-                category: category,
-                mask: this.categories.BALL
-            },
-            ...options
-        });
-
-        // 패들을 물리 월드에 추가
-        this.scene.matter.world.add(paddleBody);
-
-        return paddleBody;
-    }
-
-    // 벽돌 생성
-    createBrick(x, y, isPlayerBrick = true, options = {}) {
-        const brickConfig = this.config.brick;
-        const category = isPlayerBrick ? this.categories.BRICK_PLAYER : this.categories.BRICK_AI;
-        
-        const brickBody = this.scene.matter.add.rectangle(
-            x + brickConfig.width / 2, 
-            y + brickConfig.height / 2, 
-            brickConfig.width, 
-            brickConfig.height, 
+    createBrickBody(x, y, width, height) {
+        // 벽돌 물리 바디 생성
+        const brick = this.scene.matter.add.rectangle(
+            x + width / 2, y + height / 2,
+            width, height,
             {
                 isStatic: true,
-                restitution: 1.0,
-                friction: 0,
-                collisionFilter: {
-                    category: category,
-                    mask: this.categories.BALL
-                },
-                ...options
+                label: 'brick',
+                restitution: 1.0
             }
         );
-
-        return brickBody;
+        
+        return brick;
     }
 
-    // 벽 생성 (화면 경계)
-    createWalls() {
-        const { width, height } = this.scene.sys.game.config;
-        const wallThickness = 32;
-        
-        const walls = [
-            // 왼쪽 벽
-            this.scene.matter.add.rectangle(-wallThickness/2, height/2, wallThickness, height, {
-                isStatic: true,
-                collisionFilter: { category: this.categories.WALL }
-            }),
-            // 오른쪽 벽
-            this.scene.matter.add.rectangle(width + wallThickness/2, height/2, wallThickness, height, {
-                isStatic: true,
-                collisionFilter: { category: this.categories.WALL }
-            }),
-            // 위쪽 벽
-            this.scene.matter.add.rectangle(width/2, -wallThickness/2, width, wallThickness, {
-                isStatic: true,
-                collisionFilter: { category: this.categories.WALL }
-            }),
-            // 아래쪽 벽
-            this.scene.matter.add.rectangle(width/2, height + wallThickness/2, width, wallThickness, {
-                isStatic: true,
-                collisionFilter: { category: this.categories.WALL }
-            })
-        ];
-
-        return walls;
+    setBallVelocity(ballBody, vx, vy) {
+        // 공 속도 설정
+        this.scene.matter.setVelocity(ballBody, { x: vx, y: vy });
     }
 
-    // 패들 움직임 제어
-    movePaddle(paddleBody, targetX, maxSpeed = 10) {
-        const currentX = paddleBody.position.x;
-        const diff = targetX - currentX;
-        const force = Math.max(-maxSpeed, Math.min(maxSpeed, diff * 0.1));
-        
-        this.scene.matter.setVelocityX(paddleBody, force);
+    getBallVelocity(ballBody) {
+        // 공 속도 가져오기
+        return ballBody.velocity;
     }
 
-    // 공 속도 제한
-    limitBallSpeed(ballBody, maxSpeed = null) {
-        const max = maxSpeed || this.config.ball.maxSpeed;
-        const velocity = ballBody.velocity;
-        const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-        
-        if (speed > max) {
-            const ratio = max / speed;
-            this.scene.matter.setVelocity(ballBody, 
-                velocity.x * ratio, 
-                velocity.y * ratio
-            );
-        }
-        
-        // 최소 속도 보장
-        const minSpeed = this.config.ball.speed * 0.5;
-        if (speed < minSpeed && speed > 0) {
-            const ratio = minSpeed / speed;
-            this.scene.matter.setVelocity(ballBody, 
-                velocity.x * ratio, 
-                velocity.y * ratio
-            );
+    updatePaddlePosition(paddleBody, x, y) {
+        // 패들 위치 업데이트
+        if (paddleBody.centerRect) {
+            this.scene.matter.setPosition(paddleBody.centerRect, { x: x + paddleBody.centerRect.bounds.max.x - paddleBody.centerRect.bounds.min.x, y });
+            this.scene.matter.setPosition(paddleBody.leftCircle, { x: x + paddleBody.leftCircle.circleRadius, y: y + paddleBody.leftCircle.circleRadius });
+            this.scene.matter.setPosition(paddleBody.rightCircle, { x: x + paddleBody.rightCircle.circleRadius, y: y + paddleBody.rightCircle.circleRadius });
         }
     }
 
-    // 공과 패들 충돌 시 각도 조정
-    adjustBallAngleFromPaddle(ballBody, paddleBody, isPlayerPaddle = true) {
-        const ballPos = ballBody.position;
-        const paddlePos = paddleBody.position;
-        const paddleWidth = this.config.paddle.width;
-        
-        // 패들의 어느 부분에 맞았는지 계산 (-1 to 1)
-        const hitPosition = (ballPos.x - paddlePos.x) / (paddleWidth / 2);
-        const clampedHit = Math.max(-1, Math.min(1, hitPosition));
-        
-        // 각도 계산 (패들 중앙: 수직, 양 끝: 45도)
-        const maxAngle = Math.PI / 3; // 60도
-        const angle = clampedHit * maxAngle;
-        
-        // 현재 속력 유지
-        const currentSpeed = Math.sqrt(ballBody.velocity.x ** 2 + ballBody.velocity.y ** 2);
-        const targetSpeed = Math.max(currentSpeed * 1.05, this.config.ball.speed);
-        
-        // 새 방향 계산
-        const newVx = Math.sin(angle) * targetSpeed;
-        const newVy = (isPlayerPaddle ? -1 : 1) * Math.cos(angle) * targetSpeed;
-        
-        this.scene.matter.setVelocity(ballBody, newVx, newVy);
+    removeBrick(brickBody) {
+        // 벽돌 제거
+        this.scene.matter.world.remove(brickBody);
     }
 
-    // 충돌 처리
-    handleCollisionStart(event) {
-        const pairs = event.pairs;
-        
-        pairs.forEach(pair => {
-            const { bodyA, bodyB } = pair;
-            
-            // 공과 패들 충돌
-            if (this.isBallPaddleCollision(bodyA, bodyB)) {
-                this.handleBallPaddleCollision(bodyA, bodyB);
-            }
-            
-            // 공과 벽돌 충돌
-            if (this.isBallBrickCollision(bodyA, bodyB)) {
-                this.handleBallBrickCollision(bodyA, bodyB);
-            }
-        });
+    // 벡터 유틸리티 메서드들 (성능 최적화를 위해 재사용)
+    normalizeVector(vector) {
+        const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+        if (length === 0) return { x: 0, y: 0 };
+        return { x: vector.x / length, y: vector.y / length };
     }
 
-    handleCollisionEnd(event) {
-        // 충돌 종료 시 처리할 로직
+    reflectVector(incident, normal) {
+        const dotProduct = incident.x * normal.x + incident.y * normal.y;
+        return {
+            x: incident.x - normal.x * 2 * dotProduct,
+            y: incident.y - normal.y * 2 * dotProduct
+        };
     }
 
-    // 충돌 타입 검사 헬퍼 메서드들
-    isBallPaddleCollision(bodyA, bodyB) {
-        const ballCategory = this.categories.BALL;
-        const paddleCategories = this.categories.PADDLE_PLAYER | this.categories.PADDLE_AI;
-        
-        return (bodyA.collisionFilter.category === ballCategory && 
-                (bodyB.collisionFilter.category & paddleCategories)) ||
-               (bodyB.collisionFilter.category === ballCategory && 
-                (bodyA.collisionFilter.category & paddleCategories));
+    clampVector(vector, minMagnitude, maxMagnitude) {
+        const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+        if (magnitude < minMagnitude) {
+            const normalized = this.normalizeVector(vector);
+            return {
+                x: normalized.x * minMagnitude,
+                y: normalized.y * minMagnitude
+            };
+        }
+        if (magnitude > maxMagnitude) {
+            const normalized = this.normalizeVector(vector);
+            return {
+                x: normalized.x * maxMagnitude,
+                y: normalized.y * maxMagnitude
+            };
+        }
+        return vector;
     }
 
-    isBallBrickCollision(bodyA, bodyB) {
-        const ballCategory = this.categories.BALL;
-        const brickCategories = this.categories.BRICK_PLAYER | this.categories.BRICK_AI;
+    ensureMinimumAngle(vector, minAngle) {
+        // 공이 너무 수평으로 움직이는 것을 방지
+        const normalized = this.normalizeVector(vector);
+        if (Math.abs(normalized.y) < minAngle) {
+            normalized.y = normalized.y > 0 ? minAngle : -minAngle;
+            normalized.x = Math.sqrt(1 - normalized.y * normalized.y) * Math.sign(normalized.x);
+        }
         
-        return (bodyA.collisionFilter.category === ballCategory && 
-                (bodyB.collisionFilter.category & brickCategories)) ||
-               (bodyB.collisionFilter.category === ballCategory && 
-                (bodyA.collisionFilter.category & brickCategories));
+        const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+        return {
+            x: normalized.x * magnitude,
+            y: normalized.y * magnitude
+        };
     }
-
-    handleBallPaddleCollision(bodyA, bodyB) {
-        const ballBody = bodyA.collisionFilter.category === this.categories.BALL ? bodyA : bodyB;
-        const paddleBody = ballBody === bodyA ? bodyB : bodyA;
-        
-        const isPlayerPaddle = paddleBody.collisionFilter.category === this.categories.PADDLE_PLAYER;
-        
-        // 각도 조정
-        this.adjustBallAngleFromPaddle(ballBody, paddleBody, isPlayerPaddle);
-        
-        // 이벤트 발생
-        this.scene.events.emit('ballPaddleCollision', { ballBody, paddleBody, isPlayerPaddle });
-    }
-
-    handleBallBrickCollision(bodyA, bodyB) {
-        const ballBody = bodyA.collisionFilter.category === this.categories.BALL ? bodyA : bodyB;
-        const brickBody = ballBody === bodyA ? bodyB : bodyA;
-        
-        const isPlayerBrick = brickBody.collisionFilter.category === this.categories.BRICK_PLAYER;
-        
-        // 이벤트 발생 (벽돌 제거는 GameScene에서 처리)
-        this.scene.events.emit('ballBrickCollision', { ballBody, brickBody, isPlayerBrick });
-    }
-
-    // 정리
-    destroy() {
-        this.scene.matter.world.off('collisionstart');
-        this.scene.matter.world.off('collisionend');
-    }
-}
-
-// 전역 접근을 위한 export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PhysicsManager;
-} else {
-    window.PhysicsManager = PhysicsManager;
 }

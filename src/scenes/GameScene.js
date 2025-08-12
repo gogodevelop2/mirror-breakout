@@ -1,158 +1,166 @@
-// 메인 게임 씬
-class GameScene extends Phaser.Scene {
+import { PhysicsManager } from '../systems/PhysicsManager.js';
+import { CollisionSystem } from '../systems/CollisionSystem.js';
+import { AIController } from '../systems/AIController.js';
+import { DifficultyManager } from '../systems/DifficultyManager.js';
+import { ParticleEffects } from '../effects/ParticleEffects.js';
+import { Ball } from '../entities/Ball.js';
+import { Paddle } from '../entities/Paddle.js';
+import { Brick } from '../entities/Brick.js';
+
+export class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
     }
 
-    create() {
-        console.log('GameScene started');
-        
-        // 게임 설정 초기화
-        this.config = GameConfig.gameplay;
+    init() {
+        // 게임 상태 초기화
         this.gameState = {
             running: false,
-            paused: false,
-            gameTime: 0,
+            over: false,
+            playerWon: false,
             startTime: 0,
-            playerScore: 0,
-            aiScore: 0,
+            time: 0,
             ballSplitDone: false,
+            playerScore: 0,
+            computerScore: 0,
+            countdown: 0,
+            countdownStartTime: 0,
             lastBrickSpawn: 0
         };
         
+        // 엔티티 배열
+        this.balls = [];
+        this.bricks = { player1: [], player2: [] };
+        
+        // 입력 상태
+        this.keys = {};
+    }
+
+    create() {
         // 시스템 초기화
-        this.initializeSystems();
-        
-        // 게임 엔티티 생성
-        this.createGameEntities();
-        
-        // UI 생성
-        this.createUI();
-        
-        // 이벤트 리스너 설정
-        this.setupEventListeners();
-        
-        // 입력 처리 설정
-        this.setupInput();
-        
-        // 게임 시작 카운트다운
-        this.startCountdown();
-    }
-
-    initializeSystems() {
-        // 물리 관리자
-        this.physicsManager = new PhysicsManager(this);
-        
-        // 난이도 관리자
-        this.difficultyManager = new DifficultyManager(this);
-        
-        console.log('Game systems initialized');
-    }
-
-    createGameEntities() {
-        const { width, height } = this.sys.game.config;
+        this.setupSystems();
         
         // 배경 생성
         this.createBackground();
         
-        // 게임 필드 경계 생성
-        this.walls = this.physicsManager.createWalls();
+        // 게임 엔티티 생성
+        this.createEntities();
         
+        // UI 생성
+        this.createUI();
+        
+        // 입력 설정
+        this.setupInput();
+        
+        // 게임 시작
+        this.startCountdown();
+    }
+
+    setupSystems() {
+        // 물리 시스템
+        this.physicsManager = new PhysicsManager(this);
+        
+        // 충돌 시스템
+        this.collisionSystem = new CollisionSystem(this);
+        
+        // 난이도 관리자
+        this.difficultyManager = new DifficultyManager(this);
+        
+        // 파티클 효과
+        this.particleEffects = new ParticleEffects(this);
+    }
+
+    createBackground() {
+        const { width, height } = this.cameras.main;
+        
+        // 배경 그라데이션
+        const graphics = this.add.graphics();
+        
+        const colors = [0x001133, 0x000511, 0x110011];
+        
+        for (let i = 0; i < height; i++) {
+            const progress = i / height;
+            let color;
+            
+            if (progress < 0.5) {
+                const t = progress * 2;
+                color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                    Phaser.Display.Color.ValueToColor(colors[0]),
+                    Phaser.Display.Color.ValueToColor(colors[1]),
+                    1,
+                    t
+                );
+            } else {
+                const t = (progress - 0.5) * 2;
+                color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                    Phaser.Display.Color.ValueToColor(colors[1]),
+                    Phaser.Display.Color.ValueToColor(colors[2]),
+                    1,
+                    t
+                );
+            }
+            
+            graphics.fillStyle(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+            graphics.fillRect(0, i, width, 1);
+        }
+
+        // 중앙 효과
+        const centerEffect = this.add.graphics();
+        centerEffect.fillGradientStyle(0x64c8ff, 0x64c8ff, 0x64c8ff, 0x64c8ff, 0, 0.1, 0, 0);
+        centerEffect.fillRect(0, height/2 - 30, width, 60);
+    }
+
+    createEntities() {
         // 패들 생성
-        this.createPaddles();
+        this.paddle1 = new Paddle(this, 270, 320, true);
+        this.paddle2 = new Paddle(this, 270, this.cameras.main.height - 332, false);
         
-        // 벽돌 생성
-        this.createBricks();
+        // AI 컨트롤러 설정
+        this.aiController = new AIController(this, this.paddle2, this.difficultyManager);
         
         // 공 생성
         this.createBalls();
         
-        // 특수 효과 그룹들
-        this.effectGroups = {
-            splitEffects: this.add.group(),
-            spawnEffects: this.add.group(),
-            particles: this.add.group()
-        };
+        // 벽돌 생성
+        this.createBricks();
     }
 
-    createBackground() {
-        const { width, height } = this.sys.game.config;
-        const colors = GameConfig.visual.colors.background;
-        
-        // 그라데이션 배경
-        const graphics = this.add.graphics();
-        graphics.fillGradientStyle(
-            Phaser.Display.Color.HexStringToColor(colors.top).color,
-            Phaser.Display.Color.HexStringToColor(colors.top).color,
-            Phaser.Display.Color.HexStringToColor(colors.middle).color,
-            Phaser.Display.Color.HexStringToColor(colors.bottom).color
-        );
-        graphics.fillRect(0, 0, width, height);
-        
-        // 중앙 분할선
-        const centerY = height / 2;
-        graphics.lineStyle(1, 0x4488ff, 0.3);
-        graphics.lineBetween(0, centerY, width, centerY);
-    }
-
-    createPaddles() {
-        const { width, height } = this.sys.game.config;
-        
-        // 플레이어 패들 (하단)
-        this.playerPaddle = this.physicsManager.createPaddle(
-            width / 2,
-            height - 80,
-            true // isPlayer
-        );
-        
-        // AI 패들 (상단)
-        this.aiPaddle = this.physicsManager.createPaddle(
-            width / 2,
-            80,
-            false // isPlayer
-        );
-        
-        // AI 컨트롤러 생성
-        this.aiController = new AIController(this, this.aiPaddle, this.difficultyManager);
-        
-        // 패들 스프라이트 생성 (물리 바디 위에 표시용)
-        this.playerPaddleSprite = this.add.image(0, 0, 'paddle_player').setOrigin(0.5);
-        this.aiPaddleSprite = this.add.image(0, 0, 'paddle_ai').setOrigin(0.5);
+    createBalls() {
+        this.balls = [
+            new Ball(this, 300, 280, 3, -4),
+            new Ball(this, 300, 420, -3, 4)
+        ];
     }
 
     createBricks() {
-        this.bricks = {
-            player: [],
-            ai: []
-        };
-        
         // 랜덤 패턴 생성
-        const pattern = this.generateBrickPattern();
+        const pattern = this.generateRandomBrickPattern();
         
-        // 플레이어 영역 벽돌 (하단)
-        this.createBrickSet(pattern, true);
+        // 플레이어1 벽돌 (상단)
+        this.bricks.player1 = this.createBrickSet(true, pattern);
         
-        // AI 영역 벽돌 (상단)
-        this.createBrickSet(pattern, false);
+        // 플레이어2 벽돌 (하단)
+        this.bricks.player2 = this.createBrickSet(false, pattern);
     }
 
-    generateBrickPattern() {
-        const { rows, cols, initialDensity } = this.config.brick;
+    generateRandomBrickPattern() {
+        const config = this.game.config.game;
+        const totalBricks = config.BRICK_ROWS * config.BRICK_COLS;
         const pattern = [];
         
-        for (let i = 0; i < rows * cols; i++) {
-            pattern.push(Math.random() < initialDensity);
+        for (let i = 0; i < totalBricks; i++) {
+            pattern.push(Math.random() < 0.7);
         }
         
         // 최소 벽돌 수 보장
-        const minBricks = Math.floor(rows * cols * this.config.brick.minDensity);
+        const minBricks = Math.floor(totalBricks * 0.5);
         const currentBricks = pattern.filter(Boolean).length;
         
         if (currentBricks < minBricks) {
-            const emptyPositions = pattern.map((hasBrick, index) => hasBrick ? -1 : index)
-                .filter(index => index !== -1);
+            const emptyPositions = pattern.map((hasBrick, index) => hasBrick ? -1 : index).filter(index => index !== -1);
+            const needToAdd = minBricks - currentBricks;
             
-            for (let i = 0; i < minBricks - currentBricks && emptyPositions.length > 0; i++) {
+            for (let i = 0; i < needToAdd && emptyPositions.length > 0; i++) {
                 const randomIndex = Math.floor(Math.random() * emptyPositions.length);
                 const position = emptyPositions.splice(randomIndex, 1)[0];
                 pattern[position] = true;
@@ -162,307 +170,294 @@ class GameScene extends Phaser.Scene {
         return pattern;
     }
 
-    createBrickSet(pattern, isPlayerArea) {
-        const { rows, cols, width, height, spacingX, spacingY } = this.config.brick;
-        const { width: gameWidth, height: gameHeight } = this.sys.game.config;
+    createBrickSet(isPlayer1, pattern) {
+        const config = this.game.config.game;
+        const bricks = [];
         
-        const brickArray = isPlayerArea ? this.bricks.player : this.bricks.ai;
-        const texturePrefix = isPlayerArea ? 'brick_player_' : 'brick_ai_';
-        
-        for (let i = 0; i < pattern.length; i++) {
+        for (let i = 0; i < config.BRICK_ROWS * config.BRICK_COLS; i++) {
             if (!pattern[i]) continue;
             
-            const row = Math.floor(i / cols);
-            const col = i % cols;
+            const row = Math.floor(i / config.BRICK_COLS);
+            const col = i % config.BRICK_COLS;
             
-            // 위치 계산
-            const x = col * spacingX + 15;
-            const y = isPlayerArea ?
-                gameHeight - 150 + row * spacingY : // 플레이어 영역 (하단)
-                50 + row * spacingY; // AI 영역 (상단)
+            const x = col * config.BRICK_SPACING_X + 15;
+            const y = isPlayer1
+                ? row * config.BRICK_SPACING_Y + 40
+                : this.cameras.main.height - (row * config.BRICK_SPACING_Y + 58);
             
-            // 물리 바디 생성
-            const brickBody = this.physicsManager.createBrick(x, y, isPlayerArea);
-            
-            // 스프라이트 생성
-            const textureIndex = row % 6; // 6가지 색상 순환
-            const brickSprite = this.add.image(x + width/2, y + height/2, texturePrefix + textureIndex)
-                .setOrigin(0.5);
-            
-            // 벽돌 객체
-            const brick = {
-                body: brickBody,
-                sprite: brickSprite,
-                row: row,
-                col: col,
-                destroyed: false
-            };
-            
-            brickArray.push(brick);
+            const brick = new Brick(this, x, y, isPlayer1, row);
+            bricks.push(brick);
         }
-    }
-
-    createBalls() {
-        const { width, height } = this.sys.game.config;
-        this.balls = [];
         
-        // 초기 공 2개 생성
-        const ball1 = this.createBall(width/2, height/2 - 50, { dx: 3, dy: -4 });
-        const ball2 = this.createBall(width/2, height/2 + 50, { dx: -3, dy: 4 });
-        
-        this.balls.push(ball1, ball2);
-    }
-
-    createBall(x, y, velocity = {}) {
-        const ballConfig = this.config.ball;
-        
-        // 물리 바디 생성
-        const ballBody = this.physicsManager.createBall(x, y, {
-            angle: Math.atan2(velocity.dy || 0, velocity.dx || 0),
-            speed: Math.sqrt((velocity.dx || 0)**2 + (velocity.dy || 0)**2) || ballConfig.speed
-        });
-        
-        // 스프라이트 생성
-        const ballSprite = this.add.image(x, y, 'ball').setOrigin(0.5);
-        
-        return {
-            body: ballBody,
-            sprite: ballSprite
-        };
+        return bricks;
     }
 
     createUI() {
-        const { width, height } = this.sys.game.config;
+        const { width, height } = this.cameras.main;
         
-        // 점수 표시
-        this.ui = {
-            playerScoreText: this.add.text(50, 50, 'PLAYER: 0', {
-                fontFamily: 'Orbitron',
-                fontSize: '24px',
-                fontWeight: '700',
-                fill: '#4488ff'
-            }),
-            
-            aiScoreText: this.add.text(50, height - 80, 'AI: 0', {
-                fontFamily: 'Orbitron',
-                fontSize: '24px',
-                fontWeight: '700',
-                fill: '#ff4488'
-            }),
-            
-            timeText: this.add.text(width - 50, 50, 'TIME: 0:00', {
-                fontFamily: 'Orbitron',
-                fontSize: '20px',
-                fill: '#ffffff'
-            }).setOrigin(1, 0),
-            
-            pauseText: this.add.text(width/2, height/2, 'PAUSED', {
-                fontFamily: 'Orbitron',
-                fontSize: '48px',
-                fontWeight: '900',
-                fill: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(0.5).setVisible(false)
-        };
+        // 플레이어 라벨
+        this.add.text(20, 30, 'PLAYER (You)', {
+            fontSize: '20px',
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold',
+            fill: '#4488ff'
+        });
         
-        // 카운트다운 텍스트
-        this.countdownText = this.add.text(width/2, height/2, '', {
-            fontFamily: 'Orbitron',
-            fontSize: '120px',
-            fontWeight: '900',
-            fill: '#4af',
-            stroke: '#002244',
-            strokeThickness: 6
-        }).setOrigin(0.5);
-    }
-
-    setupEventListeners() {
-        // 물리 충돌 이벤트
-        this.events.on('ballPaddleCollision', this.handleBallPaddleCollision, this);
-        this.events.on('ballBrickCollision', this.handleBallBrickCollision, this);
+        this.add.text(20, height - 10, 'COMPUTER', {
+            fontSize: '20px',
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold',
+            fill: '#ff4488'
+        });
+        
+        // 시간 표시
+        this.timeText = this.add.text(width - 100, 30, 'Time: 0:00', {
+            fontSize: '16px',
+            fontFamily: 'Arial, sans-serif',
+            fill: '#fff'
+        });
     }
 
     setupInput() {
         // 키보드 입력
-        this.keys = this.input.keyboard.addKeys('LEFT,RIGHT,A,D,P,R,ESC');
+        this.input.keyboard.on('keydown', (event) => {
+            this.keys[event.key] = true;
+        });
         
-        // 연속 입력을 위한 커서 키
-        this.cursors = this.input.keyboard.createCursorKeys();
-    }
-
-    startCountdown() {
-        this.gameState.running = false;
-        let count = 3;
+        this.input.keyboard.on('keyup', (event) => {
+            this.keys[event.key] = false;
+        });
         
-        const countdown = () => {
-            if (count > 0) {
-                this.countdownText.setText(count.toString());
-                this.tweens.add({
-                    targets: this.countdownText,
-                    scaleX: { from: 1.5, to: 1 },
-                    scaleY: { from: 1.5, to: 1 },
-                    alpha: { from: 0.5, to: 1 },
-                    duration: 800,
-                    ease: 'Back.easeOut'
-                });
-                count--;
-                this.time.delayedCall(1000, countdown);
-            } else {
-                this.countdownText.setText('START!');
-                this.tweens.add({
-                    targets: this.countdownText,
-                    scaleX: { from: 1.5, to: 0 },
-                    scaleY: { from: 1.5, to: 0 },
-                    alpha: { from: 1, to: 0 },
-                    duration: 1000,
-                    ease: 'Back.easeIn',
-                    onComplete: () => {
-                        this.startGame();
-                    }
-                });
-            }
-        };
-        
-        countdown();
-    }
-
-    startGame() {
-        this.gameState.running = true;
-        this.gameState.startTime = this.time.now;
-        console.log('Game started!');
-    }
-
-    update(time, delta) {
-        if (!this.gameState.running || this.gameState.paused) {
-            return;
-        }
-        
-        // 게임 시간 업데이트
-        this.gameState.gameTime = (time - this.gameState.startTime) / 1000;
-        
-        // 입력 처리
-        this.handleInput();
-        
-        // AI 업데이트
-        this.aiController.update(this.balls, delta);
-        
-        // 게임 엔티티 업데이트
-        this.updateBalls();
-        this.updatePaddles();
-        
-        // UI 업데이트
-        this.updateUI();
-    }
-
-    handleInput() {
-        const paddleSpeed = this.config.paddle.player.maxSpeed;
-        
-        // 패들 이동
-        if (this.cursors.left.isDown || this.keys.A.isDown) {
-            this.physicsManager.movePaddle(this.playerPaddle,
-                this.playerPaddle.position.x - paddleSpeed, paddleSpeed);
-        } else if (this.cursors.right.isDown || this.keys.D.isDown) {
-            this.physicsManager.movePaddle(this.playerPaddle,
-                this.playerPaddle.position.x + paddleSpeed, paddleSpeed);
-        }
-        
-        // 일시정지
-        if (Phaser.Input.Keyboard.JustDown(this.keys.P)) {
-            this.togglePause();
-        }
-        
-        // 재시작
-        if (Phaser.Input.Keyboard.JustDown(this.keys.R)) {
-            this.restartGame();
-        }
-        
-        // 메뉴로 돌아가기
-        if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
-            this.returnToMenu();
-        }
-    }
-
-    updateBalls() {
-        this.balls.forEach(ball => {
-            // 스프라이트 위치를 물리 바디와 동기화
-            ball.sprite.setPosition(ball.body.position.x, ball.body.position.y);
-            
-            // 속도 제한
-            this.physicsManager.limitBallSpeed(ball.body);
+        // ESC 키로 메뉴로 돌아가기
+        this.input.keyboard.on('keydown-ESC', () => {
+            this.scene.start('MenuScene');
         });
     }
 
-    updatePaddles() {
-        // 패들 스프라이트를 물리 바디와 동기화
-        this.playerPaddleSprite.setPosition(
-            this.playerPaddle.position.x,
-            this.playerPaddle.position.y
-        );
+    startCountdown() {
+        this.gameState.countdown = 3;
+        this.gameState.countdownStartTime = Date.now();
+        this.runCountdown();
+    }
+
+    runCountdown() {
+        const elapsed = Date.now() - this.gameState.countdownStartTime;
+        const secondsElapsed = Math.floor(elapsed / 1000);
         
-        this.aiPaddleSprite.setPosition(
-            this.aiPaddle.position.x,
-            this.aiPaddle.position.y
-        );
+        if (secondsElapsed < 3) {
+            this.gameState.countdown = 3 - secondsElapsed;
+            this.time.delayedCall(100, () => this.runCountdown());
+        } else {
+            this.gameState.countdown = 0;
+            this.time.delayedCall(500, () => {
+                this.gameState.running = true;
+                this.gameState.startTime = Date.now();
+            });
+        }
+    }
+
+    update() {
+        if (!this.gameState.running) return;
+        
+        // 시간 업데이트
+        this.gameState.time = Math.floor((Date.now() - this.gameState.startTime) / 1000);
+        this.updateUI();
+        
+        // 시스템 업데이트
+        this.difficultyManager.update();
+        this.aiController.update(this.balls);
+        
+        // 플레이어 패들 업데이트
+        this.paddle1.update(this.keys);
+        this.paddle2.update();
+        
+        // 공 업데이트
+        this.balls.forEach(ball => ball.update());
+        
+        // 충돌 체크
+        this.collisionSystem.checkAllCollisions(this.balls, [this.paddle1, this.paddle2], this.bricks);
+        
+        // 공 분열 체크
+        this.checkBallSplit();
+        
+        // 새 벽돌 생성
+        this.spawnNewBricks();
+        
+        // 게임 종료 체크
+        this.checkGameEnd();
     }
 
     updateUI() {
-        // 점수 업데이트
-        this.ui.playerScoreText.setText(`PLAYER: ${this.gameState.playerScore}`);
-        this.ui.aiScoreText.setText(`AI: ${this.gameState.aiScore}`);
+        const minutes = Math.floor(this.gameState.time / 60);
+        const seconds = this.gameState.time % 60;
+        this.timeText.setText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+    }
+
+    checkBallSplit() {
+        const config = this.game.config.game;
+        if (this.gameState.ballSplitDone || this.gameState.time < config.SPLIT_TIME || this.balls.length === 0) return;
+
+        const totalBricks = config.BRICK_ROWS * config.BRICK_COLS;
+        const p1Broken = totalBricks - this.bricks.player1.length;
+        const p2Broken = totalBricks - this.bricks.player2.length;
+        const winningPlayer = p1Broken > p2Broken ? 'player1' : 'player2';
         
-        // 시간 업데이트
-        const minutes = Math.floor(this.gameState.gameTime / 60);
-        const seconds = Math.floor(this.gameState.gameTime % 60);
-        this.ui.timeText.setText(`TIME: ${minutes}:${seconds.toString().padStart(2, '0')}`);
-    }
-
-    // 이벤트 핸들러들
-    handleBallPaddleCollision(data) {
-        console.log('Ball hit paddle');
-    }
-
-    handleBallBrickCollision(data) {
-        console.log('Ball hit brick');
-    }
-
-    // 게임 제어 메서드들
-    togglePause() {
-        this.gameState.paused = !this.gameState.paused;
-        this.ui.pauseText.setVisible(this.gameState.paused);
+        const targetBall = this.balls.find(ball =>
+            winningPlayer === 'player1' ? ball.y < this.cameras.main.height / 2 : ball.y > this.cameras.main.height / 2
+        ) || this.balls[0];
         
-        if (this.gameState.paused) {
-            this.matter.world.enabled = false;
-        } else {
-            this.matter.world.enabled = true;
+        if (targetBall) {
+            // 분열 효과
+            this.particleEffects.createSplitEffect(targetBall.x, targetBall.y, winningPlayer === 'player1' ? '#4488ff' : '#ff4488');
+            
+            // 새 공 생성
+            const newBall = new Ball(this, targetBall.x, targetBall.y, -targetBall.dx * 1.2, -targetBall.dy * 0.8);
+            this.balls.push(newBall);
+            
+            this.gameState.ballSplitDone = true;
         }
     }
 
-    restartGame() {
-        this.scene.restart();
+    spawnNewBricks() {
+        const config = this.game.config.game;
+        if (this.gameState.time < config.BRICK_SPAWN_INTERVAL ||
+            Date.now() - this.gameState.lastBrickSpawn < config.BRICK_SPAWN_INTERVAL * 1000) return;
+        
+        this.gameState.lastBrickSpawn = Date.now();
+        
+        // 플레이어1 영역에 벽돌 추가
+        this.trySpawnBrick(true);
+        
+        // 플레이어2 영역에 벽돌 추가
+        this.trySpawnBrick(false);
     }
 
-    returnToMenu() {
-        this.scene.start('MenuScene');
+    trySpawnBrick(isPlayer1) {
+        const config = this.game.config.game;
+        const emptyPositions = this.findEmptyPositions(isPlayer1);
+        
+        if (emptyPositions.length > 0) {
+            const randomPos = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
+            const newBrick = new Brick(this, randomPos.x, randomPos.y, isPlayer1, randomPos.row);
+            
+            if (isPlayer1) {
+                this.bricks.player1.push(newBrick);
+            } else {
+                this.bricks.player2.push(newBrick);
+            }
+            
+            // 스폰 효과
+            this.particleEffects.createSpawnEffect(
+                newBrick.x + newBrick.width / 2,
+                newBrick.y + newBrick.height / 2,
+                isPlayer1 ? '#4488ff' : '#ff4488'
+            );
+        }
     }
 
-    // 정리
-    destroy() {
-        if (this.physicsManager) {
-            this.physicsManager.destroy();
+    findEmptyPositions(isPlayer1) {
+        const config = this.game.config.game;
+        const emptyPositions = [];
+        const existingBricks = isPlayer1 ? this.bricks.player1 : this.bricks.player2;
+        
+        for (let row = 0; row < config.BRICK_ROWS; row++) {
+            for (let col = 0; col < config.BRICK_COLS; col++) {
+                const x = col * config.BRICK_SPACING_X + 15;
+                const y = isPlayer1
+                    ? row * config.BRICK_SPACING_Y + 40
+                    : this.cameras.main.height - (row * config.BRICK_SPACING_Y + 58);
+                
+                // 해당 위치에 벽돌이 있는지 확인
+                const hasExistingBrick = existingBricks.some(brick =>
+                    Math.abs(brick.x - x) < 5 && Math.abs(brick.y - y) < 5
+                );
+                
+                if (!hasExistingBrick) {
+                    emptyPositions.push({ row, col, x, y });
+                }
+            }
         }
-        if (this.difficultyManager) {
-            this.difficultyManager.destroy();
-        }
-        if (this.aiController) {
-            this.aiController.destroy();
+        
+        return emptyPositions;
+    }
+
+    checkGameEnd() {
+        if (!this.gameState.running) return;
+
+        const p1Count = this.bricks.player1.length;
+        const p2Count = this.bricks.player2.length;
+
+        if (p1Count === 0 || p2Count === 0) {
+            this.gameState.running = false;
+            this.gameState.over = true;
+            this.gameState.playerWon = p1Count === 0;
+            
+            // 게임 오버 씬으로 전환
+            this.time.delayedCall(2000, () => {
+                this.scene.start('GameOverScene', {
+                    playerWon: this.gameState.playerWon,
+                    time: this.gameState.time,
+                    playerScore: this.gameState.playerScore,
+                    computerScore: this.gameState.computerScore
+                });
+            });
         }
     }
-}
 
-// 전역 접근을 위한 export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = GameScene;
-} else {
-    window.GameScene = GameScene;
+    render() {
+        // 카운트다운 표시
+        if (this.gameState.countdown > 0) {
+            const { width, height } = this.cameras.main;
+            
+            // 오버레이
+            this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
+            
+            // 카운트다운 텍스트
+            const countdownText = this.add.text(width / 2, height / 2, this.gameState.countdown.toString(), {
+                fontSize: '120px',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold',
+                fill: '#ffffff'
+            }).setOrigin(0.5);
+            
+            // 애니메이션 효과
+            const scale = Math.sin((Date.now() - this.gameState.countdownStartTime) % 1000 / 1000 * Math.PI) * 0.2 + 1;
+            countdownText.setScale(scale);
+        }
+        
+        // START 표시
+        else if (this.gameState.countdown === 0 && !this.gameState.running && !this.gameState.over && this.gameState.countdownStartTime > 0) {
+            const { width, height } = this.cameras.main;
+            
+            this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
+            
+            const startText = this.add.text(width / 2, height / 2, 'START!', {
+                fontSize: '80px',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold',
+                fill: '#4af'
+            }).setOrigin(0.5);
+        }
+
+        // 게임 오버 표시
+        if (this.gameState.over) {
+            const { width, height } = this.cameras.main;
+            
+            this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+            
+            this.add.text(width / 2, height / 2 - 40, 'GAME OVER', {
+                fontSize: '60px',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold',
+                fill: '#ffffff'
+            }).setOrigin(0.5);
+            
+            this.add.text(width / 2, height / 2 + 20, this.gameState.playerWon ? 'YOU WIN' : 'YOU LOSE', {
+                fontSize: '36px',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold',
+                fill: this.gameState.playerWon ? '#4af' : '#f44'
+            }).setOrigin(0.5);
+        }
+    }
 }

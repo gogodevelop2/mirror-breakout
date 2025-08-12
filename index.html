@@ -3,65 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mirror Breakout - Phaser Edition</title>
+    <title>Mirror Breakout</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-        
         body {
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+            background: #111;
             color: white;
             font-family: 'Orbitron', monospace;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             min-height: 100vh;
             overflow: hidden;
         }
         
         #game-container {
-            border: 2px solid #333;
-            border-radius: 12px;
-            box-shadow: 0 0 30px rgba(68, 170, 255, 0.3);
-            background: #000;
+            text-align: center;
         }
         
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: #4af;
-            z-index: 1000;
+        canvas {
+            border: 2px solid #444;
+            border-radius: 22px;
+            background: #000;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div class="loading">Loading Mirror Breakout...</div>
+        <canvas id="game-canvas"></canvas>
     </div>
     
-    <!-- Phaser 3 CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
-    
-    <!-- Game Configuration -->
-    <script src="src/config/GameConfig.js"></script>
-    
-    <!-- Core Systems -->
-    <script src="src/systems/PhysicsManager.js"></script>
-    <script src="src/systems/AIController.js"></script>
-    <script src="src/systems/DifficultyManager.js"></script>
-    
-    <!-- Scenes -->
-    <script src="src/scenes/PreloadScene.js"></script>
-    <script src="src/scenes/MenuScene.js"></script>
-    <script src="src/scenes/GameScene.js"></script>
-    <script src="src/scenes/GameOverScene.js"></script>
-    
-    <!-- Main Entry Point -->
-    <script src="src/main.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>
