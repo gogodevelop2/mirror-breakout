@@ -162,7 +162,11 @@ class UIRenderer {
             100
         );
         glow.addColorStop(0, resultColor);
-        glow.addColorStop(1, `${resultColor}88`);
+        // 승리/패배에 따른 다른 투명 색상
+        const glowColor = playerWon
+            ? 'rgba(68, 170, 255, 0.3)'  // 파란색 투명
+            : 'rgba(255, 68, 68, 0.3)';   // 빨간색 투명
+        glow.addColorStop(1, glowColor);
         
         ctx.fillStyle = glow;
         ctx.fillText(resultText, CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
