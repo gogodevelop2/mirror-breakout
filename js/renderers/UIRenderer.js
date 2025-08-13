@@ -146,30 +146,23 @@ class UIRenderer {
         ctx.strokeText('GAME OVER', CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 60);
     }
     
-    // 게임 결과
+    // 게임 결과 - 단순화된 버전
     drawGameResult(playerWon) {
         const ctx = this.ctx;
         
         ctx.font = 'bold 36px Arial';
         const resultText = playerWon ? 'YOU WIN' : 'YOU LOSE';
-        const resultColor = playerWon ? '#4af' : '#f44';
         
-        // 결과 텍스트 글로우
-        const glow = ctx.createRadialGradient(
-            CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2,
-            0,
-            CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2,
-            100
-        );
-        glow.addColorStop(0, resultColor);
-        // 승리/패배에 따른 다른 투명 색상
-        const glowColor = playerWon
-            ? 'rgba(68, 170, 255, 0.3)'  // 파란색 투명
-            : 'rgba(255, 68, 68, 0.3)';   // 빨간색 투명
-        glow.addColorStop(1, glowColor);
-        
-        ctx.fillStyle = glow;
+        // 단순 색상 사용 (그라데이션 제거)
+        ctx.fillStyle = playerWon ? '#44aaff' : '#ff4444';
         ctx.fillText(resultText, CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+        
+        // 글로우 효과 (shadowBlur 사용)
+        ctx.save();
+        ctx.shadowColor = playerWon ? '#44aaff' : '#ff4444';
+        ctx.shadowBlur = 20;
+        ctx.fillText(resultText, CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+        ctx.restore();
     }
     
     // 최종 점수
