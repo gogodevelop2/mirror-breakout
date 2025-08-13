@@ -1,184 +1,132 @@
-/**
- * Mirror Breakout - Main Game Entry Point
- * Phaser.js 기반 리팩토링 버전
- */
+// js/main.js
 
-class MirrorBreakout {
-    constructor() {
-        this.game = null;
-        this.isGameRunning = false;
+// 전역 변수
+let canvas;
+let ctx;
+let renderer;
+let animationId;
+
+// 초기화
+function init() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    
+    // 캔버스 크기 설정
+    canvas.width = CONFIG.CANVAS_WIDTH;
+    canvas.height = CONFIG.CANVAS_HEIGHT;
+    
+    // 렌더러 생성
+    renderer = new Renderer(canvas, ctx);
+    
+    // 초기 게임 설정
+    gameLogic.initGame();
+    
+    // 초기 화면 그리기
+    renderer.render();
+}
+
+// 게임 시작/정지 토글
+function toggleGame() {
+    if (gameState.running || gameState.over) {
+        resetGame();
+    } else {
+        startGame();
+    }
+    
+    updateButtonText();
+}
+
+// 게임 시작
+function startGame() {
+    // 게임 초기화
+    gameLogic.initGame();
+    
+    // 상태 리셋
+    gameState.running = false;
+    gameState.over = false;
+    gameState.playerWon = false;
+    gameState.time = 0;
+    gameState.ballSplitDone = false;
+    
+    // 카운트다운 시작
+    gameState.startCountdown();
+    
+    // 카운트다운 루프 시작
+    countdownLoop();
+}
+
+// 게임 리셋
+function resetGame() {
+    // 애니메이션 중지
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+    
+    // 상태 리셋
+    gameState.reset();
+    
+    // 게임 재초기화
+    gameLogic.initGame();
+    
+    // 화면 다시 그리기
+    renderer.render();
+    
+    updateButtonText();
+}
+
+// 카운트다운 루프
+function countdownLoop() {
+    const countdownComplete = gameLogic.updateCountdown();
+    
+    if (!countdownComplete) {
+        // 카운트다운 중 - 화면 업데이트
+        renderer.render();
+        animationId = requestAnimationFrame(countdownLoop);
+    } else {
+        // 카운트다운 완료 - 게임 시작
+        setTimeout(() => {
+            gameState.running = true;
+            gameState.startTime = Date.now();
+            gameLoop();
+        }, 500);
+    }
+}
+
+// 메인 게임 루프
+function gameLoop() {
+    if (gameState.running) {
+        // 게임 로직 업데이트
+        gameLogic.update();
         
-        this.initializeGame();
-        this.setupUI();
-    }
-    
-    /**
-     * Phaser 게임 초기화
-     */
-    initializeGame() {
-        const config = {
-            type: Phaser.AUTO,
-            width: GameConfig.CANVAS.WIDTH,
-            height: GameConfig.CANVAS.HEIGHT,
-            parent: 'game-container',
-            backgroundColor: '#000000',
-            
-            physics: {
-                default: 'arcade',
-                arcade: {
-                    gravity: { y: 0 },
-                    debug: GameConfig.DEBUG.PHYSICS
-                }
-            },
-            
-            scene: [PreloadScene, GameScene, GameOverScene],
-            
-            // 성능 최적화 설정
-            render: {
-                antialias: true,
-                pixelArt: false,
-                roundPixels: true
-            },
-            
-            // 스케일 설정
-            scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH
-            }
-        };
+        // 화면 렌더링
+        renderer.render();
         
-        this.game = new Phaser.Game(config);
-        
-        // 게임 이벤트 리스너 설정
-        this.setupGameEvents();
-    }
-    
-    /**
-     * 게임 이벤트 설정
-     */
-    setupGameEvents() {
-        // 씬 간 통신을 위한 전역 이벤트
-        this.game.events.on('gamestart', () => {
-            this.isGameRunning = true;
-            this.updateButtonText('STOP');
-        });
-        
-        this.game.events.on('gameover', (data) => {
-            this.isGameRunning = false;
-            this.updateButtonText('START');
-            console.log('Game Over:', data);
-        });
-        
-        this.game.events.on('gamereset', () => {
-            this.isGameRunning = false;
-            this.updateButtonText('START');
-        });
-    }
-    
-    /**
-     * UI 버튼 설정
-     */
-    setupUI() {
-        const toggleButton = document.getElementById('toggleButton');
-        
-        if (toggleButton) {
-            toggleButton.addEventListener('click', () => {
-                this.toggleGame();
-            });
-        }
-        
-        // 키보드 이벤트 (전역)
-        document.addEventListener('keydown', (event) => {
-            if (event.code === 'Space') {
-                event.preventDefault();
-                this.toggleGame();
-            }
-        });
-    }
-    
-    /**
-     * 게임 시작/중지 토글
-     */
-    toggleGame() {
-        if (this.isGameRunning) {
-            this.stopGame();
-        } else {
-            this.startGame();
-        }
-    }
-    
-    /**
-     * 게임 시작
-     */
-    startGame() {
-        if (this.game && this.game.scene) {
-            // 현재 활성 씬 확인
-            const currentScene = this.game.scene.getScene('GameScene');
-            
-            if (currentScene) {
-                if (currentScene.scene.isActive()) {
-                    // 게임 씬이 활성화되어 있으면 재시작
-                    currentScene.events.emit('restartGame');
-                } else {
-                    // 게임 씬으로 전환
-                    this.game.scene.start('GameScene');
-                }
-            } else {
-                // 게임 씬이 없으면 새로 시작
-                this.game.scene.start('GameScene');
-            }
-        }
-    }
-    
-    /**
-     * 게임 중지
-     */
-    stopGame() {
-        if (this.game && this.game.scene) {
-            const currentScene = this.game.scene.getScene('GameScene');
-            
-            if (currentScene && currentScene.scene.isActive()) {
-                currentScene.events.emit('stopGame');
-            }
-        }
-    }
-    
-    /**
-     * 버튼 텍스트 업데이트
-     */
-    updateButtonText(text) {
-        const toggleButton = document.getElementById('toggleButton');
-        if (toggleButton) {
-            toggleButton.textContent = text;
-        }
-    }
-    
-    /**
-     * 게임 파괴 (정리)
-     */
-    destroy() {
-        if (this.game) {
-            this.game.destroy(true);
-            this.game = null;
+        // 다음 프레임
+        animationId = requestAnimationFrame(gameLoop);
+    } else {
+        // 게임 종료 시 버튼 텍스트 업데이트
+        if (gameState.over) {
+            updateButtonText();
         }
     }
 }
 
-/**
- * 게임 시작
- */
-window.addEventListener('load', () => {
-    // 전역 게임 인스턴스
-    window.mirrorBreakout = new MirrorBreakout();
+// 버튼 텍스트 업데이트
+function updateButtonText() {
+    const button = document.getElementById('gameButton');
     
-    console.log('Mirror Breakout initialized!');
-});
-
-/**
- * 페이지 언로드 시 정리
- */
-window.addEventListener('beforeunload', () => {
-    if (window.mirrorBreakout) {
-        window.mirrorBreakout.destroy();
+    if (gameState.running) {
+        button.textContent = 'STOP';
+    } else if (gameState.over) {
+        button.textContent = 'RETRY';
+    } else {
+        button.textContent = 'START';
     }
-});
+}
+
+// 윈도우 로드 시 초기화
+window.addEventListener('DOMContentLoaded', init);
+
+// 전역 함수로 노출 (HTML onclick용)
+window.toggleGame = toggleGame;

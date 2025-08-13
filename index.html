@@ -3,32 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mirror Breakout</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Mirror Breakout - Modular</title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="header">
         <h1>Mirror Breakout</h1>
-        <button id="toggleButton">START</button>
+        <button id="gameButton" onclick="toggleGame()">START</button>
     </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 유틸리티 -->
+    <script src="js/utils/Vector.js"></script>
+    <script src="js/utils/BrickGrid.js"></script>
     
-    <div id="game-container"></div>
+    <!-- 설정 -->
+    <script src="js/config.js"></script>
     
-    <!-- Phaser.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
-    
-    <!-- Game modules in dependency order -->
-    <script src="js/utils/VectorMath.js"></script>
-    <script src="js/config/gameConfig.js"></script>
-    <script src="js/entities/Ball.js"></script>
-    <script src="js/entities/Paddle.js"></script>
-    <script src="js/entities/Brick.js"></script>
-    <script src="js/systems/PhysicsSystem.js"></script>
+    <!-- 게임 시스템 -->
+    <script src="js/game/GameState.js"></script>
+    <script src="js/managers/BrickManager.js"></script>
     <script src="js/systems/AISystem.js"></script>
-    <script src="js/systems/CollisionSystem.js"></script>
-    <script src="js/scenes/PreloadScene.js"></script>
-    <script src="js/scenes/GameScene.js"></script>
-    <script src="js/scenes/GameOverScene.js"></script>
+    <script src="js/physics/Physics.js"></script>
+    
+    <!-- 렌더러 -->
+    <script src="js/renderers/EffectRenderer.js"></script>
+    <script src="js/renderers/UIRenderer.js"></script>
+    <script src="js/game/Renderer.js"></script>
+    
+    <script src="js/game/GameLogic.js"></script>
+    
+    <!-- 메인 -->
     <script src="js/main.js"></script>
 </body>
 </html>
