@@ -13,16 +13,20 @@
     </div>
     <canvas id="gameCanvas"></canvas>
 
+    <!-- 설정 (최우선 로드) -->
+    <script src="js/config.js"></script>
+    
     <!-- 유틸리티 -->
     <script src="js/utils/Vector.js"></script>
     <script src="js/utils/BrickGrid.js"></script>
     
-    <!-- 설정 -->
-    <script src="js/config.js"></script>
-    
-    <!-- 게임 시스템 -->
+    <!-- 게임 상태 -->
     <script src="js/game/GameState.js"></script>
+    
+    <!-- 매니저 -->
     <script src="js/managers/BrickManager.js"></script>
+    
+    <!-- 시스템 -->
     <script src="js/systems/AISystem.js"></script>
     <script src="js/physics/Physics.js"></script>
     
@@ -31,9 +35,10 @@
     <script src="js/renderers/UIRenderer.js"></script>
     <script src="js/game/Renderer.js"></script>
     
+    <!-- 게임 로직 -->
     <script src="js/game/GameLogic.js"></script>
     
-    <!-- 메인 -->
+    <!-- 메인 (마지막) -->
     <script src="js/main.js"></script>
 </body>
 </html>
