@@ -132,40 +132,28 @@ class UIRenderer {
         ctx.textBaseline = 'alphabetic';
     }
     
-    // 게임 오버 타이틀
+    // 게임 오버 타이틀 (평면 텍스트)
     drawGameOverTitle() {
         const ctx = this.ctx;
         
         ctx.font = 'bold 60px Arial';
         ctx.fillStyle = '#ffffff';
         ctx.fillText('GAME OVER', CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 60);
-        
-        // 그림자 효과
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 4;
-        ctx.strokeText('GAME OVER', CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 60);
     }
     
-    // 게임 결과 - 단순화된 버전
+    // 게임 결과 (평면 텍스트)
     drawGameResult(playerWon) {
         const ctx = this.ctx;
         
         ctx.font = 'bold 36px Arial';
         const resultText = playerWon ? 'YOU WIN' : 'YOU LOSE';
+        const resultColor = playerWon ? '#4af' : '#f44';
         
-        // 단순 색상 사용 (그라데이션 제거)
-        ctx.fillStyle = playerWon ? '#44aaff' : '#ff4444';
+        ctx.fillStyle = resultColor;
         ctx.fillText(resultText, CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
-        
-        // 글로우 효과 (shadowBlur 사용)
-        ctx.save();
-        ctx.shadowColor = playerWon ? '#44aaff' : '#ff4444';
-        ctx.shadowBlur = 20;
-        ctx.fillText(resultText, CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
-        ctx.restore();
     }
     
-    // 최종 점수
+    // 최종 점수 (평면 텍스트)
     drawFinalScore(gameState) {
         const ctx = this.ctx;
         
