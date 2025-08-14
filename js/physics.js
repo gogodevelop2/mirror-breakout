@@ -30,15 +30,15 @@ class PhysicsEngine {
         const thickness = 0.2;
         const cornerRadius = Utils.toMeters(CONFIG.CORNER_RADIUS);
         
-        // Create walls reduced by corner radius (to leave space for curves)
+        // Create full walls (temporarily no corner reduction for debugging)
         // Top wall
-        this.createWall(w/2, -thickness/2, w/2 - cornerRadius, thickness/2);
+        this.createWall(w/2, -thickness/2, w/2, thickness/2);
         // Bottom wall  
-        this.createWall(w/2, h + thickness/2, w/2 - cornerRadius, thickness/2);
+        this.createWall(w/2, h + thickness/2, w/2, thickness/2);
         // Left wall
-        this.createWall(-thickness/2, h/2, thickness/2, h/2 - cornerRadius);
+        this.createWall(-thickness/2, h/2, thickness/2, h/2);
         // Right wall
-        this.createWall(w + thickness/2, h/2, thickness/2, h/2 - cornerRadius);
+        this.createWall(w + thickness/2, h/2, thickness/2, h/2);
         
         // Create concave rounded corners (circles positioned to create inward curves)
         const cornerPositions = [
@@ -48,9 +48,10 @@ class PhysicsEngine {
             { x: cornerRadius, y: h - cornerRadius }           // Bottom-left
         ];
         
-        cornerPositions.forEach(pos => {
-            this.createConcaveCorner(pos.x, pos.y, cornerRadius);
-        });
+        // TEMPORARILY DISABLED: Round corners for debugging
+        // cornerPositions.forEach(pos => {
+        //     this.createConcaveCorner(pos.x, pos.y, cornerRadius);
+        // });
     }
     
     // Create a wall
@@ -263,8 +264,12 @@ class PhysicsEngine {
         const fixtureB = contact.getFixtureB();
         const bodyA = fixtureA.getBody();
         const bodyB = fixtureB.getBody();
-        const dataA = bodyA.getUserData();
-        const dataB = bodyB.getUserData();
+        
+        // Try both body and fixture userData (some objects use different sources)
+        const dataA = bodyA.getUserData() || fixtureA.getUserData();
+        const dataB = bodyB.getUserData() || fixtureB.getUserData();
+        
+        // console.log('Collision detected:', dataA?.type, 'vs', dataB?.type);
         
         if (!dataA || !dataB) return;
         
@@ -330,6 +335,56 @@ class PhysicsEngine {
         if ((dataA.type === 'ball' && dataB.type === 'wall') ||
             (dataB.type === 'ball' && dataA.type === 'wall')) {
             
+            const ballBody = dataA.type === 'ball' ? bodyA : bodyB;
+            // console.log('Wall collision detected!', ballBody.getLinearVelocity());
+            
+            // Store pre-collision velocity for angle restoration
+            const preCollisionVel = ballBody.getLinearVelocity();
+            const preCollisionSpeed = preCollisionVel.length();
+            
+            // Fix collision resolution destroying angles
+            setTimeout(() => {
+                const postVel = ballBody.getLinearVelocity();
+                const postSpeed = postVel.length();
+                
+                // Check if collision destroyed the angle (became too vertical or horizontal)
+                const absX = Math.abs(postVel.x);
+                const absY = Math.abs(postVel.y);
+                const ratio = Math.min(absX, absY) / Math.max(absX, absY);
+                
+                // If angle became too shallow (ratio < 0.1 means less than ~6 degrees)
+                if (ratio < 0.1 && postSpeed > 0.5) {
+                    // console.log('Angle correction needed!', 'ratio:', ratio, 'pre:', preCollisionVel, 'post:', postVel);
+                    
+                    // Restore some angle based on pre-collision direction
+                    const targetSpeed = Math.max(preCollisionSpeed, CONFIG.BALL.BASE_SPEED);
+                    
+                    let newVelX, newVelY;
+                    if (absX < absY) {
+                        // Too vertical, add horizontal component
+                        const sign = Math.sign(preCollisionVel.x) || (Math.random() > 0.5 ? 1 : -1);
+                        newVelX = sign * targetSpeed * 0.3; // 30% horizontal
+                        newVelY = Math.sign(postVel.y) * targetSpeed * 0.95; // 95% vertical
+                    } else {
+                        // Too horizontal, add vertical component
+                        const sign = Math.sign(preCollisionVel.y) || (Math.random() > 0.5 ? 1 : -1);
+                        newVelX = Math.sign(postVel.x) * targetSpeed * 0.95; // 95% horizontal
+                        newVelY = sign * targetSpeed * 0.3; // 30% vertical
+                    }
+                    
+                    ballBody.setLinearVelocity(planck.Vec2(newVelX, newVelY));
+                    // console.log('Applied correction:', newVelX, newVelY);
+                }
+                // Energy compensation if speed dropped too much
+                else if (postSpeed < preCollisionSpeed * 0.8) {
+                    const boostFactor = Math.max(1.1, preCollisionSpeed / postSpeed);
+                    ballBody.setLinearVelocity(planck.Vec2(
+                        postVel.x * boostFactor,
+                        postVel.y * boostFactor
+                    ));
+                }
+            }, 1);
+            
             this.collisionCallbacks.push({
                 type: 'wallHit'
             });
@@ -393,20 +448,20 @@ class PhysicsEngine {
                 }
             }
             
-            // Ensure minimum angle (prevent horizontal movement)
-            const currentVel = ball.body.getLinearVelocity();
-            const angle = Math.atan2(Math.abs(currentVel.y), Math.abs(currentVel.x));
-            if (angle < CONFIG.MIN_ANGLE) {
-                const currentSpeed = currentVel.length();
-                const newAngle = CONFIG.MIN_ANGLE;
-                const signX = Math.sign(currentVel.x) || 1;
-                const signY = Math.sign(currentVel.y) || 1;
-                
-                ball.body.setLinearVelocity(planck.Vec2(
-                    signX * currentSpeed * Math.cos(newAngle),
-                    signY * currentSpeed * Math.sin(newAngle)
-                ));
-            }
+            // DISABLED: Minimum angle enforcement (was preventing natural physics)
+            // const currentVel = ball.body.getLinearVelocity();
+            // const angle = Math.atan2(Math.abs(currentVel.y), Math.abs(currentVel.x));
+            // if (angle < CONFIG.MIN_ANGLE) {
+            //     const currentSpeed = currentVel.length();
+            //     const newAngle = CONFIG.MIN_ANGLE;
+            //     const signX = Math.sign(currentVel.x) || 1;
+            //     const signY = Math.sign(currentVel.y) || 1;
+            //     
+            //     ball.body.setLinearVelocity(planck.Vec2(
+            //         signX * currentSpeed * Math.cos(newAngle),
+            //         signY * currentSpeed * Math.sin(newAngle)
+            //     ));
+            // }
         });
     }
     

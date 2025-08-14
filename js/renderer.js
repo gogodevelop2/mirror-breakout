@@ -27,10 +27,11 @@ class Renderer {
         this.gradientCache.background.addColorStop(0.5, CONFIG.COLORS.BG_GRADIENT[1]);
         this.gradientCache.background.addColorStop(1, CONFIG.COLORS.BG_GRADIENT[2]);
         
-        // Center wave effect
+        // Center wave effect (aligned with paddle center)
+        const paddleCenter = (Utils.toPixels(CONFIG.PADDLE.PLAYER_Y) + Utils.toPixels(CONFIG.PADDLE.AI_Y)) / 2;
         this.gradientCache.wave = this.ctx.createLinearGradient(
-            0, CONFIG.CANVAS_HEIGHT/2 - 30,
-            0, CONFIG.CANVAS_HEIGHT/2 + 30
+            0, paddleCenter - 30,
+            0, paddleCenter + 30
         );
         this.gradientCache.wave.addColorStop(0, 'rgba(100, 200, 255, 0)');
         this.gradientCache.wave.addColorStop(0.5, 'rgba(100, 200, 255, 0.1)');
@@ -83,9 +84,10 @@ class Renderer {
         this.ctx.fillStyle = this.gradientCache.background;
         this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         
-        // Center wave effect
+        // Center wave effect (aligned with paddle center)
+        const paddleCenter = (Utils.toPixels(CONFIG.PADDLE.PLAYER_Y) + Utils.toPixels(CONFIG.PADDLE.AI_Y)) / 2;
         this.ctx.fillStyle = this.gradientCache.wave;
-        this.ctx.fillRect(0, CONFIG.CANVAS_HEIGHT/2 - 30, CONFIG.CANVAS_WIDTH, 60);
+        this.ctx.fillRect(0, paddleCenter - 30, CONFIG.CANVAS_WIDTH, 60);
     }
     
     // Draw all bricks
@@ -304,14 +306,19 @@ class Renderer {
     
     // Draw UI elements
     drawUI(game) {
-        // Player label (top)
+        // Player label (top) - using top baseline
         this.ctx.font = CONFIG.FONTS.LABEL;
+        this.ctx.textBaseline = 'top';
         this.ctx.fillStyle = CONFIG.COLORS.PLAYER;
-        this.ctx.fillText('PLAYER (You)', 20, 30);
+        this.ctx.fillText('PLAYER (You)', 20, 10);
         
-        // AI label (bottom)
+        // AI label (bottom) - using bottom baseline for perfect symmetry
+        this.ctx.textBaseline = 'bottom';
         this.ctx.fillStyle = game.ai.color;
         this.ctx.fillText('COMPUTER', 20, CONFIG.CANVAS_HEIGHT - 10);
+        
+        // Reset baseline for other text
+        this.ctx.textBaseline = 'alphabetic';
         
         // Time display
         if (game.state.phase === 'playing') {
