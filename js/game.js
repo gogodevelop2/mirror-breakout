@@ -27,13 +27,20 @@ class GameManager {
         this.ai = {
             difficulty: 1.0,
             color: CONFIG.COLORS.AI_BASE,
-            targetBallId: null
+            targetBallId: null,
+            lastDifficultyUpdate: 0
         };
         
         // Entity references
         this.paddleIds = {
             player: null,
             ai: null
+        };
+        
+        // Paddle velocity tracking (for acceleration system)
+        this.paddleVelocity = {
+            player: 0,
+            ai: 0
         };
         
         // Effects
@@ -75,10 +82,15 @@ class GameManager {
         this.score.player = 0;
         this.score.ai = 0;
         
+        // Reset paddle velocities
+        this.paddleVelocity.player = 0;
+        this.paddleVelocity.ai = 0;
+        
         // Reset AI
         this.ai.difficulty = 1.0;
         this.ai.color = CONFIG.COLORS.AI_BASE;
         this.ai.targetBallId = null;
+        this.ai.lastDifficultyUpdate = 0;
         
         // Clear effects
         this.effects.splitEffect = null;
@@ -92,14 +104,14 @@ class GameManager {
     
     // Create paddles
     createPaddles() {
-        // Player paddle at bottom
+        // Player paddle at top (화면 상단)
         this.paddleIds.player = this.physics.createPaddle(
             CONFIG.PADDLE.START_X,
             CONFIG.PADDLE.PLAYER_Y,
             true
         );
         
-        // AI paddle at top
+        // AI paddle at bottom (화면 하단)
         this.paddleIds.ai = this.physics.createPaddle(
             CONFIG.PADDLE.START_X,
             CONFIG.PADDLE.AI_Y,
@@ -107,44 +119,52 @@ class GameManager {
         );
     }
     
-    // Create initial balls
+    // Create initial balls (원본과 동일한 위치)
     createInitialBalls() {
-        // Ball 1 - starts in player area, moves up
+        // Ball 1 - 원본: (300, 280) -> meters: (3.0, 2.8)
+        // Player 영역에서 시작, 위로(AI를 향해) 발사
         this.physics.createBall(
-            CONFIG.WORLD_WIDTH / 2 - 0.5,
-            CONFIG.WORLD_HEIGHT / 2 + 1,
-            3,   // vx in m/s
-            -4   // vy in m/s (upward)
+            3.0,   // 300px / 100
+            2.8,   // 280px / 100 (Player 영역)
+            2.1,   // vx in m/s (오른쪽으로)
+            -2.8   // vy in m/s (음수 = 위로, AI를 향해) ✅
         );
         
-        // Ball 2 - starts in AI area, moves down
+        // Ball 2 - 원본: (300, 420) -> meters: (3.0, 4.2)
+        // AI 영역에서 시작, 아래로(Player를 향해) 발사
         this.physics.createBall(
-            CONFIG.WORLD_WIDTH / 2 + 0.5,
-            CONFIG.WORLD_HEIGHT / 2 - 1,
-            -3,  // vx in m/s
-            4    // vy in m/s (downward)
+            3.0,   // 300px / 100
+            4.2,   // 420px / 100 (AI 영역)
+            -2.1,  // vx in m/s (왼쪽으로)
+            2.8    // vy in m/s (양수 = 아래로, Player를 향해) ✅
         );
     }
     
-    // Create initial bricks
+    // Create initial bricks (상하 대칭 구조)
     createInitialBricks() {
         const pattern = this.generateRandomPattern();
+        
+        // 벽돌 그룹 전체 너비 계산
+        const totalBricksWidth = CONFIG.BRICK.COLS * CONFIG.BRICK.WIDTH +
+                                 (CONFIG.BRICK.COLS - 1) * CONFIG.BRICK.GAP_X;
+        // 중앙 정렬을 위한 시작 X 위치
+        const startX = (CONFIG.WORLD_WIDTH - totalBricksWidth) / 2;
         
         for (let row = 0; row < CONFIG.BRICK.ROWS; row++) {
             for (let col = 0; col < CONFIG.BRICK.COLS; col++) {
                 const index = row * CONFIG.BRICK.COLS + col;
                 if (!pattern[index]) continue;
                 
-                // Calculate position
-                const x = CONFIG.BRICK.OFFSET_X + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X);
+                // Calculate x position (centered)
+                const x = startX + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X) + CONFIG.BRICK.WIDTH/2;
                 
-                // Player bricks (bottom area)
-                const playerY = CONFIG.BRICK.PLAYER_OFFSET_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y);
-                this.physics.createBrick(x, playerY, row, col, true);
+                // Player가 깨야 할 벽돌 (위쪽) - playerTargetBricks
+                const topY = CONFIG.BRICK.PLAYER_BRICKS_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
+                this.physics.createBrick(x, topY, row, col, true);  // isPlayerTarget = true
                 
-                // AI bricks (top area - mirrored)
-                const aiY = CONFIG.BRICK.AI_OFFSET_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y);
-                this.physics.createBrick(x, aiY, row, col, false);
+                // AI가 깨야 할 벽돌 (아래쪽) - aiTargetBricks
+                const bottomY = CONFIG.BRICK.AI_BRICKS_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
+                this.physics.createBrick(x, bottomY, row, col, false);  // isPlayerTarget = false
             }
         }
     }
@@ -244,28 +264,60 @@ class GameManager {
         this.checkGameOver();
     }
     
-    // Update player input
+    // Update player input (with acceleration system)
     updatePlayerInput() {
-        let velocity = 0;
+        let targetVelocity = 0;
         
+        // Get input direction
         if (this.keys['ArrowLeft']) {
-            velocity = -CONFIG.PADDLE.PLAYER_SPEED;
+            targetVelocity = -CONFIG.PADDLE.PLAYER_SPEED;
         } else if (this.keys['ArrowRight']) {
-            velocity = CONFIG.PADDLE.PLAYER_SPEED;
+            targetVelocity = CONFIG.PADDLE.PLAYER_SPEED;
         }
         
-        this.physics.movePaddle(this.paddleIds.player, velocity);
+        // Apply acceleration/friction
+        if (targetVelocity !== 0) {
+            // Accelerate toward target velocity
+            const diff = targetVelocity - this.paddleVelocity.player;
+            const accelAmount = Math.sign(diff) * CONFIG.PADDLE.ACCELERATION;
+            
+            // Apply acceleration but don't overshoot
+            if (Math.abs(diff) < CONFIG.PADDLE.ACCELERATION) {
+                this.paddleVelocity.player = targetVelocity;
+            } else {
+                this.paddleVelocity.player += accelAmount;
+            }
+        } else {
+            // Apply friction when no input
+            this.paddleVelocity.player *= CONFIG.PADDLE.FRICTION;
+            
+            // Stop completely when very slow
+            if (Math.abs(this.paddleVelocity.player) < 0.1) {
+                this.paddleVelocity.player = 0;
+            }
+        }
+        
+        // Clamp to max speed
+        this.paddleVelocity.player = Math.max(
+            -CONFIG.PADDLE.PLAYER_SPEED,
+            Math.min(CONFIG.PADDLE.PLAYER_SPEED, this.paddleVelocity.player)
+        );
+        
+        // Apply velocity to paddle
+        this.physics.movePaddle(this.paddleIds.player, this.paddleVelocity.player);
     }
     
-    // Update AI
+    // Update AI (AI는 아래쪽에 있으므로 위에서 내려오는 공에 반응)
     updateAI() {
         const balls = this.physics.getEntitiesOfType('ball');
         if (balls.length === 0) {
-            this.physics.movePaddle(this.paddleIds.ai, 0);
+            // Apply friction to slow down
+            this.paddleVelocity.ai *= CONFIG.PADDLE.AI_FRICTION;
+            this.physics.movePaddle(this.paddleIds.ai, this.paddleVelocity.ai);
             return;
         }
         
-        // Find closest ball moving upward (toward AI)
+        // Find the most threatening ball to AI's territory (영역 기반 판단)
         let targetBall = null;
         let minDistance = Infinity;
         
@@ -273,9 +325,11 @@ class GameManager {
         const aiPos = aiPaddle.body.getPosition();
         
         balls.forEach(ball => {
+            const ballPos = ball.body.getPosition();
             const ballVel = ball.body.getLinearVelocity();
-            if (ballVel.y < 0) {  // Moving upward
-                const ballPos = ball.body.getPosition();
+            
+            // AI가 관심을 가져야 하는 공인지 영역 기반으로 판단
+            if (Utils.shouldAITrackBall(ballPos, ballVel)) {
                 const distance = Math.abs(ballPos.y - aiPos.y);
                 
                 if (distance < minDistance) {
@@ -285,6 +339,8 @@ class GameManager {
             }
         });
         
+        let targetVelocity = 0;
+        
         if (targetBall) {
             const ballX = targetBall.body.getPosition().x;
             const paddleX = aiPos.x;
@@ -292,32 +348,66 @@ class GameManager {
             
             // Apply difficulty multiplier
             const maxSpeed = CONFIG.PADDLE.AI_BASE_SPEED * this.ai.difficulty;
-            const velocity = Math.sign(diff) * Math.min(Math.abs(diff) * 8, maxSpeed);
+            const reactionThreshold = 0.05 / this.ai.difficulty;
             
-            this.physics.movePaddle(this.paddleIds.ai, velocity);
+            if (Math.abs(diff) > reactionThreshold) {
+                // Set target velocity based on distance
+                targetVelocity = Math.sign(diff) * Math.min(Math.abs(diff) * 6, maxSpeed);
+            }
         } else {
-            // No threatening ball, stay in center
+            // No threatening ball, move toward center
             const centerX = CONFIG.WORLD_WIDTH / 2;
             const paddleX = aiPos.x;
             const diff = centerX - paddleX;
-            const velocity = Math.sign(diff) * Math.min(Math.abs(diff) * 4, CONFIG.PADDLE.AI_BASE_SPEED);
             
-            this.physics.movePaddle(this.paddleIds.ai, velocity);
+            if (Math.abs(diff) > 0.1) {
+                targetVelocity = Math.sign(diff) * Math.min(Math.abs(diff) * 3, CONFIG.PADDLE.AI_BASE_SPEED * 0.5);
+            }
         }
+        
+        // Apply smooth acceleration to AI paddle
+        if (targetVelocity !== 0) {
+            const diff = targetVelocity - this.paddleVelocity.ai;
+            const accelAmount = Math.sign(diff) * CONFIG.PADDLE.ACCELERATION * 1.2; // AI is slightly more responsive
+            
+            if (Math.abs(diff) < CONFIG.PADDLE.ACCELERATION) {
+                this.paddleVelocity.ai = targetVelocity;
+            } else {
+                this.paddleVelocity.ai += accelAmount;
+            }
+        } else {
+            // Apply friction
+            this.paddleVelocity.ai *= CONFIG.PADDLE.AI_FRICTION;
+            
+            if (Math.abs(this.paddleVelocity.ai) < 0.1) {
+                this.paddleVelocity.ai = 0;
+            }
+        }
+        
+        // Clamp to max speed
+        const maxSpeed = CONFIG.PADDLE.AI_BASE_SPEED * this.ai.difficulty;
+        this.paddleVelocity.ai = Math.max(-maxSpeed, Math.min(maxSpeed, this.paddleVelocity.ai));
+        
+        // Apply velocity
+        this.physics.movePaddle(this.paddleIds.ai, this.paddleVelocity.ai);
     }
     
     // Process collision events
     processCollisions(collisions) {
         collisions.forEach(collision => {
             if (collision.type === 'brickHit') {
-                // Update score first (before removing)
-                if (collision.isPlayerBrick) {
-                    this.score.ai++;
-                } else {
+                // 점수 계산 수정:
+                // Player가 깨야 할 벽돌(isPlayerTarget=true)을 깨면 Player 점수
+                // AI가 깨야 할 벽돌(isPlayerTarget=false)을 깨면 AI 점수
+                if (collision.isPlayerTarget) {
+                    // Player가 깨야 할 벽돌을 깼음
                     this.score.player++;
+                } else {
+                    // AI가 깨야 할 벽돌을 깼음
+                    this.score.ai++;
                 }
                 
-                // Remove brick (after score update)
+                // Remove brick
                 this.physics.removeEntity(collision.brickId);
             }
         });
@@ -332,15 +422,28 @@ class GameManager {
         const balls = this.physics.getEntitiesOfType('ball');
         if (balls.length === 0) return;
         
-        // Choose ball to split (first one)
-        const ball = balls[0];
-        const pos = ball.body.getPosition();
-        const vel = ball.body.getLinearVelocity();
-        
-        // Determine which side is winning
+        // Count remaining bricks
         const playerBricks = this.physics.getEntitiesOfType('playerBrick').length;
         const aiBricks = this.physics.getEntitiesOfType('aiBrick').length;
-        const isPlayerWinning = playerBricks < aiBricks;
+        const totalBricks = CONFIG.BRICK.ROWS * CONFIG.BRICK.COLS;
+        
+        // Calculate who is winning (less bricks = winning)
+        const playerBroken = totalBricks - playerBricks;
+        const aiBroken = totalBricks - aiBricks;
+        const isPlayerWinning = playerBroken > aiBroken;
+        
+        // Find appropriate ball to split (우세한 쪽 영역의 공)
+        const targetBall = balls.find(ball => {
+            const pos = ball.body.getPosition();
+            if (isPlayerWinning) {
+                return pos.y < CONFIG.WORLD_HEIGHT / 2;  // Player 영역 (위쪽)
+            } else {
+                return pos.y > CONFIG.WORLD_HEIGHT / 2;  // AI 영역 (아래쪽)
+            }
+        }) || balls[0];
+        
+        const pos = targetBall.body.getPosition();
+        const vel = targetBall.body.getLinearVelocity();
         
         // Add split effect
         this.effects.splitEffect = {
@@ -351,12 +454,12 @@ class GameManager {
             color: isPlayerWinning ? CONFIG.COLORS.PLAYER : CONFIG.COLORS.AI_BASE
         };
         
-        // Create new ball with opposite velocity
+        // Create new ball with modified velocity (slower)
         this.physics.createBall(
             pos.x,
             pos.y,
-            -vel.x * 1.2,
-            -vel.y * 0.8
+            -vel.x * 0.8,  // 80% of original velocity
+            -vel.y * 0.6   // 60% of original velocity
         );
         
         this.state.ballSplitDone = true;
@@ -371,74 +474,97 @@ class GameManager {
         
         this.state.lastBrickSpawnTime = this.state.gameTime;
         
-        // Try to spawn a few bricks
-        for (let i = 0; i < 2; i++) {
-            this.trySpawnBrick(true);   // Player side
-            this.trySpawnBrick(false);  // AI side
-        }
+        // Try to spawn one brick for each side
+        this.trySpawnBrick(true);   // Player side
+        this.trySpawnBrick(false);  // AI side
     }
     
     // Try to spawn a single brick
-    trySpawnBrick(isPlayerSide) {
-        // Check if we have room
-        const existingBricks = this.physics.getEntitiesOfType(isPlayerSide ? 'playerBrick' : 'aiBrick');
-        if (existingBricks.length >= 30) return;
+    trySpawnBrick(isPlayerTarget) {
+        // Check if we have room (max 60 bricks per side)
+        const existingBricks = this.physics.getEntitiesOfType(isPlayerTarget ? 'playerTargetBrick' : 'aiTargetBrick');
+        const maxBricks = CONFIG.BRICK.ROWS * CONFIG.BRICK.COLS;
+        if (existingBricks.length >= maxBricks) return;
+        
+        // 벽돌 그룹 전체 너비 계산
+        const totalBricksWidth = CONFIG.BRICK.COLS * CONFIG.BRICK.WIDTH +
+                                 (CONFIG.BRICK.COLS - 1) * CONFIG.BRICK.GAP_X;
+        // 중앙 정렬을 위한 시작 X 위치
+        const startX = (CONFIG.WORLD_WIDTH - totalBricksWidth) / 2;
         
         // Find empty position
-        const row = Math.floor(Math.random() * CONFIG.BRICK.ROWS);
-        const col = Math.floor(Math.random() * CONFIG.BRICK.COLS);
+        const emptyPositions = [];
         
-        const x = CONFIG.BRICK.OFFSET_X + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X);
-        const y = isPlayerSide
-            ? CONFIG.BRICK.PLAYER_OFFSET_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y)
-            : CONFIG.BRICK.AI_OFFSET_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y);
-        
-        // Check if position is occupied
-        let occupied = false;
-        existingBricks.forEach(brick => {
-            const brickPos = brick.body.getPosition();
-            if (Math.abs(brickPos.x - x) < CONFIG.BRICK.WIDTH * 0.9 &&
-                Math.abs(brickPos.y - y) < CONFIG.BRICK.HEIGHT * 0.9) {
-                occupied = true;
+        for (let row = 0; row < CONFIG.BRICK.ROWS; row++) {
+            for (let col = 0; col < CONFIG.BRICK.COLS; col++) {
+                const x = startX + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X) + CONFIG.BRICK.WIDTH/2;
+                const y = isPlayerTarget
+                    ? CONFIG.BRICK.PLAYER_BRICKS_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2
+                    : CONFIG.BRICK.AI_BRICKS_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
+                
+                // Check if position is occupied
+                let occupied = false;
+                existingBricks.forEach(brick => {
+                    const brickPos = brick.body.getPosition();
+                    if (Math.abs(brickPos.x - x) < CONFIG.BRICK.WIDTH * 0.5 &&
+                        Math.abs(brickPos.y - y) < CONFIG.BRICK.HEIGHT * 0.5) {
+                        occupied = true;
+                    }
+                });
+                
+                if (!occupied) {
+                    emptyPositions.push({ x, y, row, col });
+                }
             }
-        });
+        }
         
-        if (!occupied) {
-            this.physics.createBrick(x, y, row, col, isPlayerSide);
+        if (emptyPositions.length > 0) {
+            const pos = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
+            this.physics.createBrick(pos.x, pos.y, pos.row, pos.col, isPlayerTarget);
             
             // Add spawn effect
             this.effects.spawnEffects.push({
-                x: x,
-                y: y,
+                x: pos.x,
+                y: pos.y,
                 radius: 0,
                 maxRadius: 0.3,  // in meters
                 opacity: 1,
-                color: isPlayerSide ? CONFIG.COLORS.PLAYER : CONFIG.COLORS.AI_BASE
+                color: isPlayerTarget ? CONFIG.COLORS.PLAYER : CONFIG.COLORS.AI_BASE
             });
         }
     }
     
     // Update difficulty based on brick difference
     updateDifficulty() {
-        const playerBricks = this.physics.getEntitiesOfType('playerBrick').length;
-        const aiBricks = this.physics.getEntitiesOfType('aiBrick').length;
-        const diff = aiBricks - playerBricks;
+        const now = Date.now();
+        if (now - this.ai.lastDifficultyUpdate < CONFIG.DIFFICULTY.UPDATE_INTERVAL) return;
+        
+        this.ai.lastDifficultyUpdate = now;
+        
+        const playerTargetBricks = this.physics.getEntitiesOfType('playerTargetBrick').length;
+        const aiTargetBricks = this.physics.getEntitiesOfType('aiTargetBrick').length;
+        
+        // 남은 타겟 벽돌이 적을수록 우세
+        const diff = aiTargetBricks - playerTargetBricks;
+        
+        let targetDifficulty = 1.0;
         
         if (diff > 0) {
-            // AI is losing, increase difficulty
-            this.ai.difficulty = Math.min(
+            // AI가 지고 있음 (AI 타겟이 더 많이 남음), 난이도 증가
+            targetDifficulty = Math.min(
                 CONFIG.DIFFICULTY.MAX,
                 1.0 + diff * CONFIG.DIFFICULTY.INCREASE_RATE
             );
         } else if (diff < 0) {
-            // AI is winning, decrease difficulty
-            this.ai.difficulty = Math.max(
+            // AI가 이기고 있음 (Player 타겟이 더 많이 남음), 난이도 감소
+            targetDifficulty = Math.max(
                 CONFIG.DIFFICULTY.MIN,
                 1.0 + diff * CONFIG.DIFFICULTY.DECREASE_RATE
             );
-        } else {
-            this.ai.difficulty = 1.0;
         }
+        
+        // Smooth transition using lerp
+        this.ai.difficulty = this.ai.difficulty + (targetDifficulty - this.ai.difficulty) * CONFIG.DIFFICULTY.LERP_FACTOR;
         
         // Update AI paddle color
         this.ai.color = Utils.getAIDifficultyColor(this.ai.difficulty);
@@ -464,19 +590,15 @@ class GameManager {
         });
     }
     
-    // Add brick destroy effect
-    addBrickDestroyEffect(x, y, isPlayerBrick) {
-        // Optional: Add particle effects here
-    }
-    
     // Check game over
     checkGameOver() {
-        const playerBricks = this.physics.getEntitiesOfType('playerBrick').length;
-        const aiBricks = this.physics.getEntitiesOfType('aiBrick').length;
+        const playerTargetBricks = this.physics.getEntitiesOfType('playerTargetBrick').length;
+        const aiTargetBricks = this.physics.getEntitiesOfType('aiTargetBrick').length;
         
-        if (playerBricks === 0 || aiBricks === 0) {
+        if (playerTargetBricks === 0 || aiTargetBricks === 0) {
             this.state.phase = 'over';
-            this.state.playerWon = (playerBricks === 0);
+            // Player wins if all player target bricks are destroyed
+            this.state.playerWon = (playerTargetBricks === 0);
         }
     }
     

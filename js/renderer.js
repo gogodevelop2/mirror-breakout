@@ -10,6 +10,10 @@ class Renderer {
         this.canvas.width = CONFIG.CANVAS_WIDTH;
         this.canvas.height = CONFIG.CANVAS_HEIGHT;
         
+        // Enable anti-aliasing
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
+        
         // Cache for performance
         this.gradientCache = {};
         this.setupGradients();
@@ -35,8 +39,8 @@ class Renderer {
     
     // Main render function
     render(physics, game) {
-        // Clear canvas
-        this.clear();
+        // Setup rounded corners clipping
+        this.setupRoundedClip();
         
         // Draw background
         this.drawBackground();
@@ -54,12 +58,23 @@ class Renderer {
         
         // Draw overlays (countdown, game over)
         this.drawOverlays(game);
+        
+        // Restore context
+        this.ctx.restore();
     }
     
-    // Clear canvas
-    clear() {
-        this.ctx.fillStyle = '#000';
-        this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+    // Setup rounded corner clipping
+    setupRoundedClip() {
+        this.ctx.save();
+        this.ctx.beginPath();
+        const r = CONFIG.CORNER_RADIUS;
+        this.ctx.moveTo(r, 0);
+        this.ctx.arcTo(CONFIG.CANVAS_WIDTH, 0, CONFIG.CANVAS_WIDTH, r, r);
+        this.ctx.arcTo(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT, CONFIG.CANVAS_WIDTH - r, CONFIG.CANVAS_HEIGHT, r);
+        this.ctx.arcTo(0, CONFIG.CANVAS_HEIGHT, 0, CONFIG.CANVAS_HEIGHT - r, r);
+        this.ctx.arcTo(0, 0, r, 0, r);
+        this.ctx.closePath();
+        this.ctx.clip();
     }
     
     // Draw background
@@ -76,24 +91,28 @@ class Renderer {
     // Draw all bricks
     drawBricks(physics) {
         // Get all bricks
-        const playerBricks = physics.getEntitiesOfType('playerBrick');
-        const aiBricks = physics.getEntitiesOfType('aiBrick');
+        const playerTargetBricks = physics.getEntitiesOfType('playerTargetBrick');
+        const aiTargetBricks = physics.getEntitiesOfType('aiTargetBrick');
         
-        [...playerBricks, ...aiBricks].forEach(brick => {
+        [...playerTargetBricks, ...aiTargetBricks].forEach(brick => {
             const pos = brick.body.getPosition();
             const x = Utils.toPixels(pos.x);
             const y = Utils.toPixels(pos.y);
             const w = Utils.toPixels(CONFIG.BRICK.WIDTH);
             const h = Utils.toPixels(CONFIG.BRICK.HEIGHT);
             
+            // Draw brick with shadow
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.shadowBlur = 2;
+            this.ctx.shadowOffsetX = 1;
+            this.ctx.shadowOffsetY = 1;
+            
             // Draw brick
             this.ctx.fillStyle = brick.color;
             this.ctx.fillRect(x - w/2, y - h/2, w, h);
             
-            // Add border
-            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            this.ctx.lineWidth = 1;
-            this.ctx.strokeRect(x - w/2, y - h/2, w, h);
+            // Reset shadow
+            this.ctx.shadowColor = 'transparent';
             
             // Add simple lighting effect
             const gradient = this.ctx.createLinearGradient(
@@ -104,18 +123,23 @@ class Renderer {
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
             this.ctx.fillStyle = gradient;
             this.ctx.fillRect(x - w/2, y - h/2, w, h);
+            
+            // Add border
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.lineWidth = 0.5;
+            this.ctx.strokeRect(x - w/2, y - h/2, w, h);
         });
     }
     
     // Draw paddles
     drawPaddles(physics, game) {
-        // Player paddle
+        // Player paddle (top)
         const playerPaddle = physics.getEntity(game.paddleIds.player);
         if (playerPaddle) {
             this.drawHexagonPaddle(playerPaddle.body, CONFIG.COLORS.PLAYER);
         }
         
-        // AI paddle with difficulty color
+        // AI paddle (bottom) with difficulty color
         const aiPaddle = physics.getEntity(game.paddleIds.ai);
         if (aiPaddle) {
             this.drawHexagonPaddle(aiPaddle.body, game.ai.color);
@@ -137,6 +161,12 @@ class Renderer {
             CONFIG.PADDLE.HEIGHT
         );
         
+        // Add shadow
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.shadowBlur = 4;
+        this.ctx.shadowOffsetX = 2;
+        this.ctx.shadowOffsetY = 2;
+        
         // Draw hexagon shape
         this.ctx.beginPath();
         vertices.forEach((v, i) => {
@@ -155,18 +185,22 @@ class Renderer {
         this.ctx.fillStyle = color;
         this.ctx.fill();
         
-        // Add shine effect
+        // Reset shadow for shine effect
+        this.ctx.shadowColor = 'transparent';
+        
+        // Add metallic shine effect
         const shineGradient = this.ctx.createLinearGradient(
             0, -Utils.toPixels(CONFIG.PADDLE.HEIGHT/2),
             0, Utils.toPixels(CONFIG.PADDLE.HEIGHT/2)
         );
         shineGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        shineGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
         shineGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
         
         this.ctx.fillStyle = shineGradient;
         this.ctx.fill();
         
-        // Add border
+        // Add edge highlight
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
@@ -184,21 +218,46 @@ class Renderer {
             const y = Utils.toPixels(pos.y);
             const r = Utils.toPixels(CONFIG.BALL.RADIUS);
             
+            // Draw ball with shadow
+            this.ctx.save();
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            this.ctx.shadowBlur = 3;
+            this.ctx.shadowOffsetX = 1;
+            this.ctx.shadowOffsetY = 1;
+            
             // Draw ball
             this.ctx.beginPath();
             this.ctx.arc(x, y, r, 0, Math.PI * 2);
             this.ctx.fillStyle = CONFIG.COLORS.BALL;
             this.ctx.fill();
             
+            // Reset shadow
+            this.ctx.shadowColor = 'transparent';
+            
+            // Add shine
+            const shine = this.ctx.createRadialGradient(
+                x - r * 0.3, y - r * 0.3, 0,
+                x - r * 0.3, y - r * 0.3, r * 0.7
+            );
+            shine.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, r, 0, Math.PI * 2);
+            this.ctx.fillStyle = shine;
+            this.ctx.fill();
+            
             // Add glow effect
-            const glow = this.ctx.createRadialGradient(x, y, 0, x, y, r * 2);
+            const glow = this.ctx.createRadialGradient(x, y, r, x, y, r * 2.5);
             glow.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
             glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             this.ctx.beginPath();
-            this.ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+            this.ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
             this.ctx.fillStyle = glow;
             this.ctx.fill();
+            
+            this.ctx.restore();
         });
     }
     
@@ -245,28 +304,25 @@ class Renderer {
     
     // Draw UI elements
     drawUI(game) {
-        // Player label
+        // Player label (top)
         this.ctx.font = CONFIG.FONTS.LABEL;
         this.ctx.fillStyle = CONFIG.COLORS.PLAYER;
         this.ctx.fillText('PLAYER (You)', 20, 30);
         
-        // AI label
+        // AI label (bottom)
         this.ctx.fillStyle = game.ai.color;
         this.ctx.fillText('COMPUTER', 20, CONFIG.CANVAS_HEIGHT - 10);
         
         // Time display
         if (game.state.phase === 'playing') {
             this.ctx.font = CONFIG.FONTS.TIME;
-            this.ctx.fillStyle = CONFIG.COLORS.UI.TEXT;
+            this.ctx.fillStyle = CONFIG.COLORS.UI.TIME;
             this.ctx.fillText(
                 `Time: ${game.getTimeString()}`,
                 CONFIG.CANVAS_WIDTH - 100,
                 30
             );
         }
-        
-        // Score (optional - not in original)
-        // this.ctx.fillText(`Score: ${game.score.player} - ${game.score.ai}`, 20, 60);
     }
     
     // Draw overlays (countdown, game over)
@@ -284,12 +340,10 @@ class Renderer {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         
-        // Countdown number
+        // Countdown animation
         this.ctx.save();
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.font = CONFIG.FONTS.COUNTDOWN;
-        this.ctx.fillStyle = CONFIG.COLORS.UI.TEXT;
         
         // Animate scale
         const elapsed = (Date.now() - game.state.countdownStartTime) % 1000;
@@ -299,12 +353,30 @@ class Renderer {
         this.ctx.scale(scale, scale);
         
         if (game.state.countdown > 0) {
+            // Countdown number
+            this.ctx.font = CONFIG.FONTS.COUNTDOWN;
+            this.ctx.fillStyle = CONFIG.COLORS.UI.COUNTDOWN;
             this.ctx.fillText(game.state.countdown.toString(), 0, 0);
+            
+            // Add glow
+            this.ctx.strokeStyle = 'rgba(68, 170, 255, 0.5)';
+            this.ctx.lineWidth = 3;
+            this.ctx.strokeText(game.state.countdown.toString(), 0, 0);
         } else {
             // Show "START!" briefly
-            this.ctx.font = 'bold 80px Arial';
-            this.ctx.fillStyle = CONFIG.COLORS.PLAYER;
+            this.ctx.font = CONFIG.FONTS.START;
+            
+            // Gradient text
+            const glow = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 100);
+            glow.addColorStop(0, CONFIG.COLORS.UI.START);
+            glow.addColorStop(1, 'rgba(68, 170, 255, 0.3)');
+            this.ctx.fillStyle = glow;
             this.ctx.fillText('START!', 0, 0);
+            
+            // Outline
+            this.ctx.strokeStyle = CONFIG.COLORS.UI.START;
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeText('START!', 0, 0);
         }
         
         this.ctx.restore();
@@ -325,7 +397,7 @@ class Renderer {
         this.ctx.fillText(
             'GAME OVER',
             CONFIG.CANVAS_WIDTH / 2,
-            CONFIG.CANVAS_HEIGHT / 2 - 40
+            CONFIG.CANVAS_HEIGHT / 2 - 60
         );
         
         // Win/Lose text
@@ -334,7 +406,7 @@ class Renderer {
         this.ctx.fillText(
             game.state.playerWon ? 'YOU WIN!' : 'YOU LOSE',
             CONFIG.CANVAS_WIDTH / 2,
-            CONFIG.CANVAS_HEIGHT / 2 + 20
+            CONFIG.CANVAS_HEIGHT / 2
         );
         
         // Final score
@@ -343,10 +415,84 @@ class Renderer {
         this.ctx.fillText(
             `Player: ${game.score.player} | Computer: ${game.score.ai}`,
             CONFIG.CANVAS_WIDTH / 2,
-            CONFIG.CANVAS_HEIGHT / 2 + 70
+            CONFIG.CANVAS_HEIGHT / 2 + 50
+        );
+        
+        // Time played
+        this.ctx.font = CONFIG.FONTS.TIME;
+        this.ctx.fillText(
+            `Time: ${game.getTimeString()}`,
+            CONFIG.CANVAS_WIDTH / 2,
+            CONFIG.CANVAS_HEIGHT / 2 + 80
         );
         
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'alphabetic';
+    }
+    
+    // DEBUG: Draw all physics bodies with walls in red
+    drawPhysicsDebug(physics) {
+        if (!physics.world) return;
+        
+        this.ctx.save();
+        this.ctx.strokeStyle = 'red';
+        this.ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        this.ctx.lineWidth = 2;
+        
+        // Iterate through all bodies in the physics world
+        let body = physics.world.getBodyList();
+        while (body) {
+            const fixtures = body.getFixtureList();
+            let fixture = fixtures;
+            
+            while (fixture) {
+                const userData = fixture.getUserData();
+                
+                // Only draw walls (not balls, paddles, or bricks)
+                if (userData && userData.type === 'wall') {
+                    const shape = fixture.getShape();
+                    const bodyPos = body.getPosition();
+                    const bodyAngle = body.getAngle();
+                    
+                    this.ctx.save();
+                    this.ctx.translate(Utils.toPixels(bodyPos.x), Utils.toPixels(bodyPos.y));
+                    this.ctx.rotate(bodyAngle);
+                    
+                    if (shape.getType() === 'polygon') {
+                        // Draw rectangle/polygon
+                        const vertices = shape.m_vertices;
+                        this.ctx.beginPath();
+                        vertices.forEach((vertex, i) => {
+                            const x = Utils.toPixels(vertex.x);
+                            const y = Utils.toPixels(vertex.y);
+                            if (i === 0) {
+                                this.ctx.moveTo(x, y);
+                            } else {
+                                this.ctx.lineTo(x, y);
+                            }
+                        });
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                        
+                    } else if (shape.getType() === 'circle') {
+                        // Draw circle
+                        const radius = Utils.toPixels(shape.getRadius());
+                        this.ctx.beginPath();
+                        this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                    }
+                    
+                    this.ctx.restore();
+                }
+                
+                fixture = fixture.getNext();
+            }
+            
+            body = body.getNext();
+        }
+        
+        this.ctx.restore();
     }
 }
