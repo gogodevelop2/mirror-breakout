@@ -2,6 +2,8 @@
 
 물리 엔진을 사용한 혁신적인 브레이크아웃 게임입니다. 플레이어와 AI가 각각 자신의 벽돌을 모두 파괴하기 위해 경쟁합니다.
 
+An innovative breakout game using physics engine. Players and AI compete to destroy all their respective bricks.
+
 ## 게임 특징
 
 - **대칭적 게임플레이**: 상하 대칭 구조로 플레이어(위)와 AI(아래)가 경쟁
@@ -105,3 +107,78 @@ game-test01/
 ## 개발자 정보
 
 이 게임은 물리 엔진과 게임 AI의 학습 목적으로 제작되었습니다.
+
+---
+
+# English Version
+
+## Game Features
+
+- **Symmetric Gameplay**: Vertical symmetric structure where player (top) and AI (bottom) compete
+- **Physics Engine**: Realistic physics simulation using Planck.js
+- **Dynamic Difficulty**: AI automatically adjusts difficulty based on game situation
+- **Real-time Brick Generation**: New bricks randomly spawn during gameplay
+- **Ball Split System**: Ball automatically splits after 10 seconds to increase game pace
+
+## Game Rules
+
+### Objective
+- **Player**: Destroy all blue bricks at the top of the screen
+- **AI**: Destroy all red bricks at the bottom of the screen
+- First to destroy all their bricks wins
+
+### Controls
+- **← / →**: Move paddle (with acceleration system)
+
+### Game Systems
+1. **Countdown**: 3-second countdown before game starts
+2. **Ball Split**: Ball in the dominant side's area splits after 10 seconds
+3. **Brick Generation**: New bricks spawn on both sides every 10 seconds
+4. **Difficulty Adjustment**: AI automatically adjusts speed and responsiveness based on situation
+
+## Tech Stack
+
+- **HTML5 Canvas**: Game rendering
+- **Planck.js**: 2D physics engine
+- **JavaScript ES6+**: Game logic implementation
+- **CSS3**: Styling and layout
+
+## How to Run
+
+1. Run through web server (direct HTML file opening not possible due to CORS restrictions)
+2. Simple local server setup:
+   ```bash
+   # Python 3
+   python -m http.server 8000
+   
+   # Python 2
+   python -m SimpleHTTPServer 8000
+   
+   # Node.js (requires http-server)
+   npx http-server
+   ```
+3. Access `http://localhost:8000` in browser
+
+## License
+
+This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License](http://creativecommons.org/licenses/by-nc/4.0/).
+
+### Usage Terms
+- ✅ **Free Use**: Free for personal, educational, and research purposes
+- ✅ **Modification Allowed**: Code modification and improvement allowed
+- ✅ **Distribution Allowed**: Distribution of modified versions allowed
+- ⚠️ **Attribution Required**: Must credit original author and source
+- ❌ **No Commercial Use**: Commercial use prohibited
+
+### Copyright
+© 2025 Mirror Breakout. All rights reserved.
+
+The following game mechanisms are unique creative designs of this project:
+- **Physical Shared Space**: Structure where two players compete while sharing one vertically symmetric physical space (currently Player vs AI, expandable to multiplayer)
+- **Dynamic Tension System**: Mechanism that uses complexity and randomness created by 3 balls to continuously change game balance, inducing engaging gameplay
+
+For commercial use, please contact separately.
+
+## Developer Info
+
+This game was created for learning purposes of physics engines and game AI.
