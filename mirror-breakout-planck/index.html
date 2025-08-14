@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror Breakout - Planck.js</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Mirror Breakout</h1>
+        <button id="gameButton">START</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Planck.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/planck-js@0.3/dist/planck.min.js"></script>
+    
+    <!-- Game Scripts (순서 중요) -->
+    <script src="js/config.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
