@@ -406,9 +406,19 @@ class GameManager {
                     // AI가 깨야 할 벽돌을 깼음
                     this.score.ai++;
                 }
-                
-                // Remove brick
-                this.physics.removeEntity(collision.brickId);
+
+                // Mark brick for destruction (iOS-style fade out)
+                const brick = this.physics.getEntity(collision.brickId);
+                if (brick && !brick.destroying) {
+                    brick.destroying = true;
+                    brick.destroyAlpha = CONFIG.BRICK.DESTROY_ALPHA;
+                    brick.destroyStartTime = Date.now();
+
+                    // Schedule removal after delay
+                    setTimeout(() => {
+                        this.physics.removeEntity(collision.brickId);
+                    }, CONFIG.BRICK.DESTROY_DELAY * 1000);
+                }
             }
         });
     }

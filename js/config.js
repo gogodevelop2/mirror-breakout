@@ -15,8 +15,8 @@ const CONFIG = {
     
     // Physics settings
     TIMESTEP: 1/60,
-    VELOCITY_ITERATIONS: 8,
-    POSITION_ITERATIONS: 3,
+    VELOCITY_ITERATIONS: 10,  // Increased for rotating dynamic bricks (Box2D recommends 10 for complex scenes)
+    POSITION_ITERATIONS: 8,   // Increased for better collision resolution with many dynamic objects
     
     // Ball (meters)
     BALL: {
@@ -26,7 +26,8 @@ const CONFIG = {
         MIN_SPEED: 3,      // Minimum speed (300 px/s)
         BASE_SPEED: 3.5,   // Base speed to return to (350 px/s)
         SPEED_DECAY: 0.97, // Speed decay factor (3% per physics step when above base)
-        DECAY_THRESHOLD: 4  // Only decay when speed > this value
+        DECAY_THRESHOLD: 4, // Only decay when speed > this value
+        MASS: 40           // Target mass for ball (ball:brick ratio 1:25, brick=1000)
     },
     
     // Paddle (meters)
@@ -55,7 +56,16 @@ const CONFIG = {
         // Starting position for first brick (centered)
         OFFSET_X: 0.1,     // 10px from left (전체 너비 580px, 중앙 정렬을 위해)
         PLAYER_BRICKS_Y: 0.4,  // 40px from top (Player가 깨야 할 벽돌 - 위쪽)
-        AI_BRICKS_Y: 6.42      // 642px from top (AI가 깨야 할 벽돌 - 아래쪽)
+        AI_BRICKS_Y: 6.42,     // 642px from top (AI가 깨야 할 벽돌 - 아래쪽)
+        // Physics properties (iOS-style dynamic bricks)
+        MASS: 1000,             // Target mass for bricks (ball:brick ratio 1:25, ball=40)
+        RESTITUTION: 0.9,       // Bounce coefficient (0.9 = slightly inelastic)
+        FRICTION: 0.3,          // Surface friction (helps stabilize brick-brick collisions)
+        LINEAR_DAMPING: 1.0,    // Movement damping (higher for stability in JavaScript physics)
+        ANGULAR_DAMPING: 1.0,   // Rotation damping (prevents excessive rotation causing overlap)
+        // Visual effects for destroyed bricks
+        DESTROY_DELAY: 0.15,    // Delay before removal (0.15 seconds, same as iOS)
+        DESTROY_ALPHA: 0.5      // Alpha during destruction (0.5 = semi-transparent)
     },
     
     // Gameplay
@@ -108,8 +118,7 @@ const CONFIG = {
     
     // Visual settings
     CORNER_RADIUS: 20,
-    MIN_ANGLE: 0.2,  // radians
-    
+
     // Game zones (meters)
     ZONES: {
         CENTER_LINE: 3.5,        // 중앙선 (WORLD_HEIGHT / 2)

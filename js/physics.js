@@ -135,19 +135,23 @@ class PhysicsEngine {
             bullet: true,  // Enable CCD for fast moving balls
             fixedRotation: true
         });
-        
-        body.createFixture({
+
+        // Calculate density to achieve desired mass from config
+        const ballArea = Math.PI * CONFIG.BALL.RADIUS * CONFIG.BALL.RADIUS;
+        const ballDensity = CONFIG.BALL.MASS / ballArea;
+
+        const fixture = body.createFixture({
             shape: planck.Circle(CONFIG.BALL.RADIUS),
             restitution: 1.0,  // Perfect bounce
             friction: 0,
-            density: 1,
+            density: ballDensity,  // Use calculated density instead of setMassData
             userData: { type: 'ball' }
         });
-        
+
         const id = this.nextId++;
         this.entities.set(id, { body, type: 'ball', id });
         body.setUserData({ id, type: 'ball' });
-        
+
         return id;
     }
     
@@ -181,15 +185,23 @@ class PhysicsEngine {
         return id;
     }
     
-    // Create brick
+    // Create brick (iOS-style dynamic physics)
     createBrick(x, y, row, col, isPlayerTarget) {
         const body = this.world.createBody({
-            type: 'static',
-            position: planck.Vec2(x, y)
+            type: 'dynamic',              // Changed from 'static' to 'dynamic'
+            position: planck.Vec2(x, y),
+            fixedRotation: false,         // Allow rotation for natural physics (same as iOS)
+            linearDamping: CONFIG.BRICK.LINEAR_DAMPING,   // Stabilize movement
+            angularDamping: CONFIG.BRICK.ANGULAR_DAMPING, // Prevent excessive spinning
+            bullet: true                  // Enable CCD to prevent brick overlap/tunneling
         });
-        
+
         const color = Utils.getBrickColor(row, isPlayerTarget);
-        
+
+        // Calculate density to achieve desired mass from config
+        const brickArea = CONFIG.BRICK.WIDTH * CONFIG.BRICK.HEIGHT;
+        const brickDensity = CONFIG.BRICK.MASS / brickArea;
+
         body.createFixture({
             shape: planck.Box(CONFIG.BRICK.WIDTH/2, CONFIG.BRICK.HEIGHT/2),
             userData: {
@@ -198,14 +210,17 @@ class PhysicsEngine {
                 row,
                 col,
                 color
-            }
+            },
+            density: brickDensity,  // Use calculated density for proper inertia
+            restitution: CONFIG.BRICK.RESTITUTION, // Bounce factor
+            friction: CONFIG.BRICK.FRICTION        // Surface friction
         });
-        
+
         const id = this.nextId++;
         const brickType = isPlayerTarget ? 'playerTargetBrick' : 'aiTargetBrick';
         this.entities.set(id, { body, type: brickType, id, color, row, col });
         body.setUserData({ id, type: brickType });
-        
+
         return id;
     }
     
@@ -269,17 +284,15 @@ class PhysicsEngine {
         const dataA = bodyA.getUserData() || fixtureA.getUserData();
         const dataB = bodyB.getUserData() || fixtureB.getUserData();
         
-        // console.log('Collision detected:', dataA?.type, 'vs', dataB?.type);
-        
         if (!dataA || !dataB) return;
         
         // Ball-Brick collision
         if ((dataA.type === 'ball' && (dataB.type === 'playerTargetBrick' || dataB.type === 'aiTargetBrick')) ||
             (dataB.type === 'ball' && (dataA.type === 'playerTargetBrick' || dataA.type === 'aiTargetBrick'))) {
-            
+
             const ballData = dataA.type === 'ball' ? dataA : dataB;
             const brickData = dataA.type === 'ball' ? dataB : dataA;
-            
+
             // Queue brick for removal
             this.collisionCallbacks.push({
                 type: 'brickHit',
@@ -334,10 +347,9 @@ class PhysicsEngine {
         // Ball-Wall collision
         if ((dataA.type === 'ball' && dataB.type === 'wall') ||
             (dataB.type === 'ball' && dataA.type === 'wall')) {
-            
+
             const ballBody = dataA.type === 'ball' ? bodyA : bodyB;
-            // console.log('Wall collision detected!', ballBody.getLinearVelocity());
-            
+
             // Store pre-collision velocity for angle restoration
             const preCollisionVel = ballBody.getLinearVelocity();
             const preCollisionSpeed = preCollisionVel.length();
@@ -354,8 +366,6 @@ class PhysicsEngine {
                 
                 // If angle became too shallow (ratio < 0.1 means less than ~6 degrees)
                 if (ratio < 0.1 && postSpeed > 0.5) {
-                    // console.log('Angle correction needed!', 'ratio:', ratio, 'pre:', preCollisionVel, 'post:', postVel);
-                    
                     // Restore some angle based on pre-collision direction
                     const targetSpeed = Math.max(preCollisionSpeed, CONFIG.BALL.BASE_SPEED);
                     
@@ -371,9 +381,8 @@ class PhysicsEngine {
                         newVelX = Math.sign(postVel.x) * targetSpeed * 0.95; // 95% horizontal
                         newVelY = sign * targetSpeed * 0.3; // 30% vertical
                     }
-                    
+
                     ballBody.setLinearVelocity(planck.Vec2(newVelX, newVelY));
-                    // console.log('Applied correction:', newVelX, newVelY);
                 }
                 // Energy compensation if speed dropped too much
                 else if (postSpeed < preCollisionSpeed * 0.8) {
@@ -393,9 +402,15 @@ class PhysicsEngine {
     
     // Step physics and process callbacks
     step() {
-        // Step physics
-        this.world.step(CONFIG.TIMESTEP, CONFIG.VELOCITY_ITERATIONS, CONFIG.POSITION_ITERATIONS);
-        
+        // Sub-stepping: Break down each frame into smaller steps for more accurate collision detection
+        // This prevents tunneling and overlap issues with many dynamic rotating bodies
+        const subSteps = 2;  // 2 sub-steps per frame (60fps → 120 physics steps/sec)
+        const subTimeStep = CONFIG.TIMESTEP / subSteps;
+
+        for (let i = 0; i < subSteps; i++) {
+            this.world.step(subTimeStep, CONFIG.VELOCITY_ITERATIONS, CONFIG.POSITION_ITERATIONS);
+        }
+
         // Update paddle previous positions
         ['playerPaddle', 'aiPaddle'].forEach(type => {
             const paddles = this.getEntitiesOfType(type);
@@ -407,10 +422,7 @@ class PhysicsEngine {
         
         // Limit ball speeds
         this.limitBallSpeeds();
-        
-        // Ensure balls stay in bounds - DISABLED: Let physics engine handle boundaries
-        // this.keepBallsInBounds();
-        
+
         // Process collision callbacks
         const callbacks = this.collisionCallbacks.slice();
         this.collisionCallbacks = [];
@@ -448,62 +460,6 @@ class PhysicsEngine {
                 }
             }
             
-            // DISABLED: Minimum angle enforcement (was preventing natural physics)
-            // const currentVel = ball.body.getLinearVelocity();
-            // const angle = Math.atan2(Math.abs(currentVel.y), Math.abs(currentVel.x));
-            // if (angle < CONFIG.MIN_ANGLE) {
-            //     const currentSpeed = currentVel.length();
-            //     const newAngle = CONFIG.MIN_ANGLE;
-            //     const signX = Math.sign(currentVel.x) || 1;
-            //     const signY = Math.sign(currentVel.y) || 1;
-            //     
-            //     ball.body.setLinearVelocity(planck.Vec2(
-            //         signX * currentSpeed * Math.cos(newAngle),
-            //         signY * currentSpeed * Math.sin(newAngle)
-            //     ));
-            // }
-        });
-    }
-    
-    // Keep balls in bounds (safety check)
-    keepBallsInBounds() {
-        const balls = this.getEntitiesOfType('ball');
-        balls.forEach(ball => {
-            const pos = ball.body.getPosition();
-            const vel = ball.body.getLinearVelocity();
-            const radius = CONFIG.BALL.RADIUS;
-            let needsUpdate = false;
-            let newX = pos.x;
-            let newY = pos.y;
-            let newVelX = vel.x;
-            let newVelY = vel.y;
-            
-            // Check horizontal bounds
-            if (pos.x - radius < 0) {
-                newX = radius;
-                newVelX = Math.abs(vel.x);
-                needsUpdate = true;
-            } else if (pos.x + radius > CONFIG.WORLD_WIDTH) {
-                newX = CONFIG.WORLD_WIDTH - radius;
-                newVelX = -Math.abs(vel.x);
-                needsUpdate = true;
-            }
-            
-            // Check vertical bounds
-            if (pos.y - radius < 0) {
-                newY = radius;
-                newVelY = Math.abs(vel.y);
-                needsUpdate = true;
-            } else if (pos.y + radius > CONFIG.WORLD_HEIGHT) {
-                newY = CONFIG.WORLD_HEIGHT - radius;
-                newVelY = -Math.abs(vel.y);
-                needsUpdate = true;
-            }
-            
-            if (needsUpdate) {
-                ball.body.setPosition(planck.Vec2(newX, newY));
-                ball.body.setLinearVelocity(planck.Vec2(newVelX, newVelY));
-            }
         });
     }
     

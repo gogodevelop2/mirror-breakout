@@ -95,41 +95,60 @@ class Renderer {
         // Get all bricks
         const playerTargetBricks = physics.getEntitiesOfType('playerTargetBrick');
         const aiTargetBricks = physics.getEntitiesOfType('aiTargetBrick');
-        
+
         [...playerTargetBricks, ...aiTargetBricks].forEach(brick => {
             const pos = brick.body.getPosition();
+            const angle = brick.body.getAngle();  // Get rotation angle
             const x = Utils.toPixels(pos.x);
             const y = Utils.toPixels(pos.y);
             const w = Utils.toPixels(CONFIG.BRICK.WIDTH);
             const h = Utils.toPixels(CONFIG.BRICK.HEIGHT);
-            
-            // Draw brick with shadow
+
+            // Save context and apply rotation
+            this.ctx.save();
+            this.ctx.translate(x, y);
+            this.ctx.rotate(angle);  // Apply rotation!
+
+            // Apply destruction alpha if brick is being destroyed (iOS-style fade out)
+            if (brick.destroying) {
+                this.ctx.globalAlpha = brick.destroyAlpha;
+            }
+
+            // Draw brick with shadow (centered at 0,0 after rotation)
             this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
             this.ctx.shadowBlur = 2;
             this.ctx.shadowOffsetX = 1;
             this.ctx.shadowOffsetY = 1;
-            
+
             // Draw brick
             this.ctx.fillStyle = brick.color;
-            this.ctx.fillRect(x - w/2, y - h/2, w, h);
-            
+            this.ctx.fillRect(-w/2, -h/2, w, h);
+
             // Reset shadow
             this.ctx.shadowColor = 'transparent';
-            
+
             // Add simple lighting effect
             const gradient = this.ctx.createLinearGradient(
-                x - w/2, y - h/2,
-                x - w/2, y + h/2
+                -w/2, -h/2,
+                -w/2, h/2
             );
             gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
             this.ctx.fillStyle = gradient;
-            this.ctx.fillRect(x - w/2, y - h/2, w, h);
-            
+            this.ctx.fillRect(-w/2, -h/2, w, h);
+
             // Add border
             this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
             this.ctx.lineWidth = 0.5;
-            this.ctx.strokeRect(x - w/2, y - h/2, w, h);
+            this.ctx.strokeRect(-w/2, -h/2, w, h);
+
+            // Reset global alpha
+            if (brick.destroying) {
+                this.ctx.globalAlpha = 1.0;
+            }
+
+            // Restore context
+            this.ctx.restore();
         });
     }
     
