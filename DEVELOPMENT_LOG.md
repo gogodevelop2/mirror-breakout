@@ -7,7 +7,63 @@
 
 ---
 
-## 2025-10-01: iOS 스타일 동적 벽돌 물리 구현
+## 2025-10-01 (Session 2): UI 개선 및 게임플레이 조정
+
+### 주요 변경 사항
+
+#### 1. 랜덤 발사 각도 구현
+**목적**: 매 게임마다 다른 패턴으로 시작
+
+**구현** (`config.js`, `game.js`):
+```javascript
+// config.js:31
+BALL.LAUNCH_ANGLE_VARIATION: 30  // ±30도 랜덤 변화
+
+// config.js:235 - Utils 헬퍼 함수
+getRandomLaunchVelocity(baseVx, baseVy) {
+    const speed = Math.sqrt(baseVx * baseVx + baseVy * baseVy);
+    const baseAngle = Math.atan2(baseVy, baseVx);
+    const variation = (Math.random() - 0.5) * 2 * (CONFIG.BALL.LAUNCH_ANGLE_VARIATION * Math.PI / 180);
+    const newAngle = baseAngle + variation;
+    return { vx: speed * Math.cos(newAngle), vy: speed * Math.sin(newAngle) };
+}
+
+// game.js:123 - 발사 시 적용
+const ball1 = Utils.getRandomLaunchVelocity(2.1, -2.8);
+this.physics.createBall(3.0, 2.8, ball1.vx, ball1.vy);
+```
+
+**결과**:
+- Ball 1: -83° ~ -23° 범위 (기본 -53°)
+- Ball 2: 97° ~ 157° 범위 (기본 127°)
+
+#### 2. UI 간소화 및 플레이 공간 확대
+**변경**:
+- "PLAYER (You)" 라벨 제거
+- "COMPUTER" 라벨 제거
+- Time 표시만 우측 상단 유지
+
+**효과**:
+- 더 깔끔한 화면
+- 플레이 공간 확대
+
+#### 3. 벽돌 증가
+**변경**:
+```javascript
+// config.js
+BRICK.ROWS: 6 → 7  // 한 줄 추가
+PLAYER_BRICKS_Y: 0.4 → 0.19  // 상단 여백 활용
+AI_BRICKS_Y: 6.42 → 6.63      // 하단 여백 활용
+```
+
+**결과**:
+- 각 진영: 60개 → **70개** 벽돌
+- 총 벽돌: 120개 → **140개**
+- 화면 상하단 끝까지 활용
+
+---
+
+## 2025-10-01 (Session 1): iOS 스타일 동적 벽돌 물리 구현
 
 ### 주요 변경 사항
 

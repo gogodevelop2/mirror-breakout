@@ -119,24 +119,24 @@ class GameManager {
         );
     }
     
-    // Create initial balls (원본과 동일한 위치)
+    // Create initial balls with random launch angles
     createInitialBalls() {
-        // Ball 1 - 원본: (300, 280) -> meters: (3.0, 2.8)
-        // Player 영역에서 시작, 위로(AI를 향해) 발사
+        // Ball 1 - Player 영역에서 시작, 위로(AI를 향해) 발사
+        const ball1 = Utils.getRandomLaunchVelocity(2.1, -2.8);
         this.physics.createBall(
-            3.0,   // 300px / 100
-            2.8,   // 280px / 100 (Player 영역)
-            2.1,   // vx in m/s (오른쪽으로)
-            -2.8   // vy in m/s (음수 = 위로, AI를 향해) ✅
+            3.0,      // 300px / 100
+            2.8,      // 280px / 100 (Player 영역)
+            ball1.vx, // Random angle variation
+            ball1.vy  // Random angle variation
         );
-        
-        // Ball 2 - 원본: (300, 420) -> meters: (3.0, 4.2)
-        // AI 영역에서 시작, 아래로(Player를 향해) 발사
+
+        // Ball 2 - AI 영역에서 시작, 아래로(Player를 향해) 발사
+        const ball2 = Utils.getRandomLaunchVelocity(-2.1, 2.8);
         this.physics.createBall(
-            3.0,   // 300px / 100
-            4.2,   // 420px / 100 (AI 영역)
-            -2.1,  // vx in m/s (왼쪽으로)
-            2.8    // vy in m/s (양수 = 아래로, Player를 향해) ✅
+            3.0,      // 300px / 100
+            4.2,      // 420px / 100 (AI 영역)
+            ball2.vx, // Random angle variation
+            ball2.vy  // Random angle variation
         );
     }
     

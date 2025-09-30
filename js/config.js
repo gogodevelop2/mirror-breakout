@@ -27,7 +27,8 @@ const CONFIG = {
         BASE_SPEED: 3.5,   // Base speed to return to (350 px/s)
         SPEED_DECAY: 0.97, // Speed decay factor (3% per physics step when above base)
         DECAY_THRESHOLD: 4, // Only decay when speed > this value
-        MASS: 40           // Target mass for ball (ball:brick ratio 1:25, brick=1000)
+        MASS: 40,          // Target mass for ball (ball:brick ratio 1:25, brick=1000)
+        LAUNCH_ANGLE_VARIATION: 30  // Random angle variation in degrees (±30°)
     },
     
     // Paddle (meters)
@@ -49,14 +50,14 @@ const CONFIG = {
     BRICK: {
         WIDTH: 0.55,       // 55px
         HEIGHT: 0.18,      // 18px
-        ROWS: 6,
+        ROWS: 7,           // Increased from 6 to 7 (added one row)
         COLS: 10,
         GAP_X: 0.03,       // 3px gap (58 - 55 = 3)
         GAP_Y: 0.03,       // 3px gap (21 - 18 = 3)
         // Starting position for first brick (centered)
         OFFSET_X: 0.1,     // 10px from left (전체 너비 580px, 중앙 정렬을 위해)
-        PLAYER_BRICKS_Y: 0.4,  // 40px from top (Player가 깨야 할 벽돌 - 위쪽)
-        AI_BRICKS_Y: 6.42,     // 642px from top (AI가 깨야 할 벽돌 - 아래쪽)
+        PLAYER_BRICKS_Y: 0.19,  // Moved closer to top edge (removed PLAYER label space)
+        AI_BRICKS_Y: 6.63,      // Moved closer to bottom edge (removed COMPUTER label space)
         // Physics properties (iOS-style dynamic bricks)
         MASS: 1000,             // Target mass for bricks (ball:brick ratio 1:25, ball=40)
         RESTITUTION: 0.9,       // Bounce coefficient (0.9 = slightly inelastic)
@@ -215,19 +216,34 @@ const Utils = {
         if (ballVel.y > 0) {
             return false;
         }
-        
+
         // 절대 원칙 2: 아래에서 중앙으로 올라가는 공은 끝까지 쫓아간다
         if (ballVel.y < 0) {
             return true;
         }
-        
+
         // 수평으로만 움직이는 공 (ballVel.y = 0)은 위치에 따라 판단
         const ballZone = this.getBallZone(ballPos.y);
         if (ballZone === 'ai' || ballZone === 'neutral') {
             return true;
         }
-        
+
         return false;
+    },
+
+    // Get random launch velocity with angle variation
+    getRandomLaunchVelocity(baseVx, baseVy) {
+        const speed = Math.sqrt(baseVx * baseVx + baseVy * baseVy);
+        const baseAngle = Math.atan2(baseVy, baseVx);
+
+        // Random variation in radians
+        const variation = (Math.random() - 0.5) * 2 * (CONFIG.BALL.LAUNCH_ANGLE_VARIATION * Math.PI / 180);
+        const newAngle = baseAngle + variation;
+
+        return {
+            vx: speed * Math.cos(newAngle),
+            vy: speed * Math.sin(newAngle)
+        };
     }
 };
 

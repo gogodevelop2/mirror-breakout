@@ -325,29 +325,17 @@ class Renderer {
     
     // Draw UI elements
     drawUI(game) {
-        // Player label (top) - using top baseline
-        this.ctx.font = CONFIG.FONTS.LABEL;
-        this.ctx.textBaseline = 'top';
-        this.ctx.fillStyle = CONFIG.COLORS.PLAYER;
-        this.ctx.fillText('PLAYER (You)', 20, 10);
-        
-        // AI label (bottom) - using bottom baseline for perfect symmetry
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillStyle = game.ai.color;
-        this.ctx.fillText('COMPUTER', 20, CONFIG.CANVAS_HEIGHT - 10);
-        
-        // Reset baseline for other text
-        this.ctx.textBaseline = 'alphabetic';
-        
         // Time display
         if (game.state.phase === 'playing') {
             this.ctx.font = CONFIG.FONTS.TIME;
             this.ctx.fillStyle = CONFIG.COLORS.UI.TIME;
+            this.ctx.textBaseline = 'top';
             this.ctx.fillText(
                 `Time: ${game.getTimeString()}`,
                 CONFIG.CANVAS_WIDTH - 100,
-                30
+                10
             );
+            this.ctx.textBaseline = 'alphabetic';
         }
     }
     
