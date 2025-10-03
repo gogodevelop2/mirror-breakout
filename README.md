@@ -7,10 +7,13 @@ An innovative breakout game using physics engine. Players and AI compete to dest
 ## 게임 특징
 
 - **대칭적 게임플레이**: 상하 대칭 구조로 플레이어(위)와 AI(아래)가 경쟁
-- **물리 엔진**: Planck.js를 사용한 실감나는 물리 시뮬레이션
-- **동적 난이도**: AI가 게임 상황에 따라 난이도를 자동 조절
+- **동적 벽돌 물리**: iOS 스타일의 회전하고 밀리는 벽돌 시뮬레이션
+- **실시간 물리 조절**: 게임 중 Ball/Brick 물리 속성을 슬라이더로 실시간 변경
+- **반응형 디자인**: 브라우저 크기에 맞춰 자동으로 게임 화면 조절
+- **동적 난이도**: AI가 게임 상황에 따라 난이도를 자동 조절 (0.6x ~ 2.0x)
 - **실시간 벽돌 생성**: 게임 진행 중 새로운 벽돌이 랜덤하게 생성
-- **볼 분할 시스템**: 10초 후 볼이 자동으로 분할되어 게임 속도 증가
+- **볼 분할 시스템**: 10초 후 우세한 쪽의 볼이 자동으로 분할되어 게임 속도 증가
+- **랜덤 발사 각도**: 매 게임마다 ±30° 랜덤 변화로 다른 패턴 생성
 
 ## 게임 규칙
 
@@ -41,12 +44,13 @@ An innovative breakout game using physics engine. Players and AI compete to dest
 game-test01/
 ├── index.html          # 메인 HTML 파일
 ├── css/
-│   └── styles.css      # 게임 스타일
+│   └── styles.css      # 게임 스타일 (반응형 레이아웃)
 ├── js/
-│   ├── config.js       # 게임 설정 및 상수
-│   ├── physics.js      # 물리 엔진 래퍼
+│   ├── config.js       # 게임 설정 (동적 캔버스 계산)
+│   ├── physics.js      # 물리 엔진 래퍼 (Planck.js)
 │   ├── game.js         # 게임 로직 및 상태 관리
-│   ├── renderer.js     # 렌더링 시스템
+│   ├── renderer.js     # 렌더링 시스템 (반응형)
+│   ├── ui-controls.js  # 물리 설정 UI 컨트롤
 │   └── main.js         # 메인 게임 루프
 └── README.md
 ```
@@ -70,18 +74,23 @@ game-test01/
 ## 게임 메커니즘
 
 ### 물리 시스템
-- 실제 물리 법칙을 따르는 볼의 움직임
-- 패들과 벽돌의 충돌 처리
-- 경계면 반사 및 마찰력 적용
+- **동적 벽돌 물리**: 벽돌이 회전하고 밀리는 iOS 스타일 시뮬레이션
+  - Ball:Brick 질량 비율 1:10 (기본값: Ball 100, Brick 1000)
+  - 벽돌 반발력 90%, 마찰 0.3, 감쇠 1.0
+  - CCD(Continuous Collision Detection)로 고속 충돌 처리
+- **반응형 물리 스케일**: 화면 크기에 관계없이 일정한 물리 동작 (6m×7m 고정 세계)
+- **실시간 물리 조절**: 슬라이더로 게임 중 Ball/Brick 속성 변경 가능
 
 ### AI 시스템
-- 동적 난이도 조절 (0.5x ~ 2.0x)
-- 게임 상황 분석 기반 반응
+- 동적 난이도 조절 (0.6x ~ 2.0x)
+- 게임 상황 분석 기반 반응 (벽돌 개수 차이로 계산)
 - 색상으로 난이도 표시 (파란색→보라색→빨간색)
+- 영역 기반 공 추적 시스템
 
 ### 시각 효과
 - 볼 분할 시 원형 확산 효과
 - 벽돌 생성 시 스폰 애니메이션
+- 벽돌 파괴 시 0.15초 페이드아웃 효과
 - 실시간 점수 및 시간 표시
 
 ## 라이선스
@@ -98,9 +107,26 @@ game-test01/
 ### 저작권
 © 2025 Mirror Breakout. All rights reserved.
 
-특히 다음 게임 메커니즘은 본 프로젝트의 독창적 설계입니다:
-- **물리적 공유 공간**: 상하 대칭으로 연결된 하나의 물리 공간을 두 플레이어가 공유하며 대결하는 구조 (현재는 플레이어 vs AI, 향후 멀티플레이어 확장 가능)
-- **동적 긴장감 시스템**: 3개의 공이 만들어내는 복잡성과 우연성이 게임 균형을 지속적으로 변화시켜, 긴장감 있는 게임 진행을 유도하는 메커니즘
+**저작권으로 보호되는 독창적 요소**:
+
+1. **핵심 게임 메커니즘** (영업 비밀/특허 가능):
+   - **물리적 공유 공간**: 상하 대칭으로 연결된 하나의 물리 공간을 두 플레이어가 공유하며 대결하는 구조 (현재는 플레이어 vs AI, 향후 멀티플레이어 확장 가능)
+   - **동적 긴장감 시스템**: 3개의 공이 만들어내는 복잡성과 우연성이 게임 균형을 지속적으로 변화시켜, 긴장감 있는 게임 진행을 유도하는 메커니즘
+   - **영역 기반 AI 추적**: 공의 방향과 위치로 추적 대상을 결정하는 알고리즘
+
+2. **기술적 구현** (저작권 자동 보호):
+   - 모든 JavaScript 소스 코드
+   - 동적 벽돌 물리 시스템 (질량/회전/충돌 알고리즘)
+   - 반응형 캔버스 시스템 (동적 SCALE 계산)
+   - 실시간 물리 조절 UI 시스템
+   - Box2D/Planck.js 통합 방식
+
+3. **시각적 요소** (저작권 보호):
+   - 육각형 패들 디자인
+   - 색상 스킴 및 그라디언트
+   - UI 레이아웃 및 애니메이션
+
+**브레이크아웃 장르 자체는 공공 영역**이며, 본 게임의 독창적인 메커니즘과 구현만 보호됩니다.
 
 상업적 사용을 원하시는 경우 별도로 연락해 주세요.
 
@@ -115,10 +141,13 @@ game-test01/
 ## Game Features
 
 - **Symmetric Gameplay**: Vertical symmetric structure where player (top) and AI (bottom) compete
-- **Physics Engine**: Realistic physics simulation using Planck.js
-- **Dynamic Difficulty**: AI automatically adjusts difficulty based on game situation
+- **Dynamic Brick Physics**: iOS-style rotating and moving brick simulation
+- **Real-time Physics Control**: Adjust Ball/Brick physics properties with sliders during gameplay
+- **Responsive Design**: Game canvas automatically adjusts to browser size
+- **Dynamic Difficulty**: AI automatically adjusts difficulty (0.6x ~ 2.0x) based on game situation
 - **Real-time Brick Generation**: New bricks randomly spawn during gameplay
 - **Ball Split System**: Ball automatically splits after 10 seconds to increase game pace
+- **Random Launch Angles**: ±30° random variation creates different patterns each game
 
 ## Game Rules
 
@@ -173,9 +202,26 @@ This project is licensed under the [Creative Commons Attribution-NonCommercial 4
 ### Copyright
 © 2025 Mirror Breakout. All rights reserved.
 
-The following game mechanisms are unique creative designs of this project:
-- **Physical Shared Space**: Structure where two players compete while sharing one vertically symmetric physical space (currently Player vs AI, expandable to multiplayer)
-- **Dynamic Tension System**: Mechanism that uses complexity and randomness created by 3 balls to continuously change game balance, inducing engaging gameplay
+**Copyrighted Original Elements**:
+
+1. **Core Game Mechanisms** (Trade Secret/Patentable):
+   - **Physical Shared Space**: Structure where two players compete while sharing one vertically symmetric physical space (currently Player vs AI, expandable to multiplayer)
+   - **Dynamic Tension System**: Mechanism that uses complexity and randomness created by 3 balls to continuously change game balance, inducing engaging gameplay
+   - **Zone-based AI Tracking**: Algorithm that determines tracking targets based on ball direction and position
+
+2. **Technical Implementation** (Automatically Copyrighted):
+   - All JavaScript source code
+   - Dynamic brick physics system (mass/rotation/collision algorithms)
+   - Responsive canvas system (dynamic SCALE calculation)
+   - Real-time physics adjustment UI system
+   - Box2D/Planck.js integration approach
+
+3. **Visual Elements** (Copyrighted):
+   - Hexagonal paddle design
+   - Color schemes and gradients
+   - UI layout and animations
+
+**The breakout game genre itself is in the public domain**; only the original mechanisms and implementation of this game are protected.
 
 For commercial use, please contact separately.
 
