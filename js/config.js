@@ -1,18 +1,53 @@
 // js/config.js
 // Mirror Breakout - Configuration (Planck.js optimized)
 
+// Calculate responsive canvas size
+function calculateCanvasSize() {
+    const maxWidth = window.innerWidth - 280;  // Account for settings panel (220px) + gap
+    const maxHeight = window.innerHeight * 0.85;  // Use 85% of viewport height
+
+    // Maintain 6:7 aspect ratio (width:height)
+    const aspectRatio = 6 / 7;
+
+    let canvasHeight = maxHeight;
+    let canvasWidth = canvasHeight * aspectRatio;
+
+    // If width exceeds available space, scale down based on width
+    if (canvasWidth > maxWidth) {
+        canvasWidth = maxWidth;
+        canvasHeight = canvasWidth / aspectRatio;
+    }
+
+    return {
+        width: Math.floor(canvasWidth),
+        height: Math.floor(canvasHeight),
+        scale: canvasHeight / 7  // SCALE = height / WORLD_HEIGHT
+    };
+}
+
+// Initialize canvas dimensions
+let canvasSize = calculateCanvasSize();
+
 const CONFIG = {
-    // Canvas dimensions (pixels)
-    CANVAS_WIDTH: 600,
-    CANVAS_HEIGHT: 700,
-    
-    // Physics scaling
-    SCALE: 100,  // 1 meter = 100 pixels
-    
-    // World dimensions (meters)
-    WORLD_WIDTH: 6,    // 600px / 100
-    WORLD_HEIGHT: 7,   // 700px / 100
-    
+    // Canvas dimensions (pixels) - now dynamic
+    CANVAS_WIDTH: canvasSize.width,
+    CANVAS_HEIGHT: canvasSize.height,
+
+    // Physics scaling - now dynamic
+    SCALE: canvasSize.scale,  // 1 meter = SCALE pixels
+
+    // World dimensions (meters) - always fixed
+    WORLD_WIDTH: 6,
+    WORLD_HEIGHT: 7,
+
+    // Update canvas size dynamically
+    updateCanvasSize() {
+        canvasSize = calculateCanvasSize();
+        this.CANVAS_WIDTH = canvasSize.width;
+        this.CANVAS_HEIGHT = canvasSize.height;
+        this.SCALE = canvasSize.scale;
+    },
+
     // Physics settings
     TIMESTEP: 1/60,
     VELOCITY_ITERATIONS: 10,  // Increased for rotating dynamic bricks (Box2D recommends 10 for complex scenes)
@@ -27,7 +62,7 @@ const CONFIG = {
         BASE_SPEED: 3.5,   // Base speed to return to (350 px/s)
         SPEED_DECAY: 0.97, // Speed decay factor (3% per physics step when above base)
         DECAY_THRESHOLD: 4, // Only decay when speed > this value
-        MASS: 40,          // Target mass for ball (ball:brick ratio 1:25, brick=1000)
+        MASS: 100,         // Target mass for ball (ball:brick ratio 1:10, brick=1000)
         LAUNCH_ANGLE_VARIATION: 30  // Random angle variation in degrees (±30°)
     },
     
@@ -247,13 +282,13 @@ const Utils = {
     }
 };
 
-// Freeze config
-Object.freeze(CONFIG);
-Object.freeze(CONFIG.BALL);
-Object.freeze(CONFIG.PADDLE);
-Object.freeze(CONFIG.BRICK);
-Object.freeze(CONFIG.GAME);
-Object.freeze(CONFIG.DIFFICULTY);
-Object.freeze(CONFIG.COLORS);
-Object.freeze(CONFIG.COLORS.UI);
-Object.freeze(CONFIG.FONTS);
+// Don't freeze CONFIG to allow dynamic updates from UI
+// Object.freeze(CONFIG);
+// Object.freeze(CONFIG.BALL);
+// Object.freeze(CONFIG.PADDLE);
+// Object.freeze(CONFIG.BRICK);
+// Object.freeze(CONFIG.GAME);
+// Object.freeze(CONFIG.DIFFICULTY);
+// Object.freeze(CONFIG.COLORS);
+// Object.freeze(CONFIG.COLORS.UI);
+// Object.freeze(CONFIG.FONTS);

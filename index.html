@@ -11,16 +11,79 @@
         <h1>Mirror Breakout</h1>
         <button id="gameButton">START</button>
     </div>
-    <canvas id="gameCanvas"></canvas>
-    
+
+    <div class="game-container">
+        <!-- Settings Panel -->
+        <div id="settingsPanel" class="settings-panel">
+            <button id="toggleSettings" class="toggle-btn">◀</button>
+
+            <div class="settings-content">
+                <h2>Physics Settings</h2>
+
+                <!-- Ball Settings -->
+                <div class="settings-group">
+                    <h3>⚪ Ball</h3>
+
+                    <div class="setting-item">
+                        <label for="ballMass">Mass</label>
+                        <input type="range" id="ballMass" class="slider">
+                        <span id="ballMassValue" class="value-display">100</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="ballSpeed">Speed</label>
+                        <input type="range" id="ballSpeed" class="slider">
+                        <span id="ballSpeedValue" class="value-display">3.5</span>
+                    </div>
+                </div>
+
+                <!-- Brick Settings -->
+                <div class="settings-group">
+                    <h3>🟦 Brick</h3>
+
+                    <div class="setting-item">
+                        <label for="brickMass">Mass</label>
+                        <input type="range" id="brickMass" class="slider">
+                        <span id="brickMassValue" class="value-display">1000</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="brickRestitution">Bounce</label>
+                        <input type="range" id="brickRestitution" class="slider" min="0.5" max="1.0" step="0.05" value="0.9">
+                        <span id="brickRestitutionValue" class="value-display">0.90</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="brickFriction">Friction</label>
+                        <input type="range" id="brickFriction" class="slider" min="0" max="0.8" step="0.05" value="0.3">
+                        <span id="brickFrictionValue" class="value-display">0.30</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="brickDamping">Damping</label>
+                        <input type="range" id="brickDamping" class="slider">
+                        <span id="brickDampingValue" class="value-display">1.0</span>
+                    </div>
+                </div>
+
+                <!-- Reset Button -->
+                <button id="resetSettings" class="reset-btn">Reset to Defaults</button>
+            </div>
+        </div>
+
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
     <!-- Planck.js from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/planck-js@0.3/dist/planck.min.js"></script>
-    
+
     <!-- Game Scripts (순서 중요) -->
     <script src="js/config.js"></script>
     <script src="js/physics.js"></script>
     <script src="js/game.js"></script>
     <script src="js/renderer.js"></script>
+    <script src="js/ui-controls.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

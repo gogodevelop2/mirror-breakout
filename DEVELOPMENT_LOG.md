@@ -7,6 +7,270 @@
 
 ---
 
+## 2025-10-03 (Session 2): 반응형 게임 화면 구현
+
+### 주요 변경 사항
+
+#### 1. 반응형 캔버스 시스템 구현
+**목적**: 브라우저 크기에 따라 게임 화면이 자동으로 조절되도록 개선
+
+**핵심 개념**:
+- **물리 세계는 고정**: 항상 6m × 7m (비율 6:7 유지)
+- **화면 크기는 가변**: 브라우저 크기에 맞춰 자동 조절
+- **SCALE 동적 계산**: `SCALE = 화면높이 / 7`
+
+**구현** (`config.js`):
+```javascript
+function calculateCanvasSize() {
+    const maxWidth = window.innerWidth - 280;    // 설정 패널 공간 고려
+    const maxHeight = window.innerHeight * 0.85; // 뷰포트 높이의 85%
+    const aspectRatio = 6 / 7;                   // 물리 세계 비율 유지
+
+    let canvasHeight = maxHeight;
+    let canvasWidth = canvasHeight * aspectRatio;
+
+    if (canvasWidth > maxWidth) {
+        canvasWidth = maxWidth;
+        canvasHeight = canvasWidth / aspectRatio;
+    }
+
+    return {
+        width: Math.floor(canvasWidth),
+        height: Math.floor(canvasHeight),
+        scale: canvasHeight / 7  // 동적 SCALE
+    };
+}
+
+// CONFIG는 더 이상 고정값이 아님
+CONFIG.CANVAS_WIDTH = canvasSize.width;   // 동적
+CONFIG.CANVAS_HEIGHT = canvasSize.height; // 동적
+CONFIG.SCALE = canvasSize.scale;          // 동적
+```
+
+**장점**:
+- ✅ 물리 계산은 m/s 단위로 그대로 유지
+- ✅ 공의 속도는 변환 불필요 (이미 m/s)
+- ✅ Utils.toPixels()가 SCALE을 사용해 자동 변환
+- ✅ 모든 화면 크기에 최적화
+
+#### 2. 리사이즈 핸들러 구현
+**목적**: 브라우저 창 크기 변경 시 자동으로 게임 화면 조절
+
+**구현** (`main.js`):
+```javascript
+setupResizeHandler() {
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            // 게임 중이 아닐 때만 리사이즈
+            if (this.game.state.phase === 'menu' ||
+                this.game.state.phase === 'over') {
+                this.handleResize();
+            }
+        }, 200);  // 200ms 디바운싱
+    });
+}
+
+handleResize() {
+    this.renderer.resize();      // CONFIG + 그라디언트 업데이트
+    this.game.init();            // 새 크기로 게임 재초기화
+    this.renderer.render(...);   // 재렌더링
+}
+```
+
+**특징**:
+- 200ms 디바운싱으로 성능 최적화
+- 게임 진행 중에는 리사이즈 방지
+- 메뉴/게임오버 상태에서만 동작
+
+#### 3. 렌더러 업데이트
+**목적**: 동적 캔버스 크기 및 그라디언트 재생성 지원
+
+**구현** (`renderer.js`):
+```javascript
+class Renderer {
+    updateCanvasSize() {
+        this.canvas.width = CONFIG.CANVAS_WIDTH;
+        this.canvas.height = CONFIG.CANVAS_HEIGHT;
+    }
+
+    resize() {
+        CONFIG.updateCanvasSize();  // CONFIG 업데이트
+        this.updateCanvasSize();     // 캔버스 크기 조정
+        this.setupGradients();       // 그라디언트 재생성
+    }
+}
+```
+
+#### 4. UI 개선
+
+**공 디자인 간소화**:
+- 블러/그림자/광택 효과 제거
+- 깔끔한 흰색 원형으로 단순화
+
+**토글 버튼 위치 수정**:
+- 패널 외부 → 패널 내부 우측 상단
+- 크기: 24×24px 작은 정사각형
+- 파란색 반투명 배경
+
+**물리 설정 기본값 조정**:
+- Ball Mass: 80 → **100** (범위: 20~160)
+- Ball:Brick 질량 비율: 1:10
+
+**슬라이더 버그 수정**:
+- HTML에 `min`, `max`, `step`, `value` 속성 명시
+- brickRestitution, brickFriction 슬라이더 초기화 문제 해결
+
+#### 5. 반응형 레이아웃 (CSS)
+
+```css
+.game-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    max-width: 100vw;
+}
+
+.settings-panel {
+    width: 220px;
+    min-width: 220px;
+    flex-shrink: 0;  /* 패널 크기 고정 */
+}
+
+#gameCanvas {
+    flex-shrink: 1;   /* 캔버스는 조절 가능 */
+    max-width: 100%;
+}
+```
+
+---
+
+## 2025-10-03 (Session 1): 실시간 물리 설정 UI 추가
+
+### 주요 변경 사항
+
+#### 1. 물리 설정 패널 구현
+**목적**: 사용자가 게임 중 실시간으로 물리 설정을 조절할 수 있도록 함
+
+**새로 추가된 파일**:
+- `js/ui-controls.js` - UIControls 클래스 (202줄)
+
+**수정된 파일**:
+- `index.html` - 설정 패널 HTML 추가
+- `css/styles.css` - 레이아웃 및 슬라이더 스타일 추가
+- `js/config.js` - Object.freeze() 제거 (동적 수정 허용)
+- `js/main.js` - UIControls 통합
+
+#### 2. 조절 가능한 물리 설정
+
+**Ball (공)**:
+- **Mass**: 20 ~ 160 (기본 80)
+  - 높이면 → 벽돌을 더 많이 밀어냄
+- **Speed**: 2.5 ~ 5.0 m/s (기본 3.5)
+  - 게임 속도 조절
+
+**Brick (벽돌)**:
+- **Mass**: 500 ~ 2000 (기본 1000)
+  - 낮추면 → 벽돌이 더 많이 움직임
+- **Bounce (Restitution)**: 0.5 ~ 1.0 (기본 0.9)
+  - 1.0 = 완전 탄성, 0.5 = 에너지 50% 손실
+- **Friction**: 0 ~ 0.8 (기본 0.3)
+  - 벽돌끼리 미끄러지는 정도
+- **Damping**: 0.5 ~ 2.0 (기본 1.0)
+  - 높이면 → 벽돌이 빠르게 멈춤
+
+#### 3. UI 기능
+
+**레이아웃**:
+```
+┌─────────────────────────────────────┐
+│  [Title] [START Button]             │
+├──────────┬──────────────────────────┤
+│ Settings │   Game Canvas (600x700) │
+│ Panel    │                          │
+│ (220px)  │                          │
+└──────────┴──────────────────────────┘
+```
+
+**기능**:
+- ✅ **실시간 적용**: 슬라이더 조작 시 즉시 물리 엔진에 반영
+- ✅ **값 표시**: 각 슬라이더 옆에 현재 값 실시간 표시
+- ✅ **Reset 버튼**: 모든 설정을 기본값으로 복원
+- ✅ **Toggle 버튼** (◀): 패널 접기/펼치기
+- ✅ **반응형**: 모바일에서 패널이 상단에 배치
+
+#### 4. 구현 세부사항
+
+**UIControls 클래스** (`js/ui-controls.js`):
+```javascript
+class UIControls {
+    constructor(config, physics)
+
+    // 슬라이더 설정 및 이벤트 연결
+    setupSlider(id, min, max, defaultValue, step, label, unit)
+
+    // 물리 설정 실시간 적용
+    applyPhysicsChange(id, value)
+    updateExistingBalls()      // 기존 공의 질량 업데이트
+    updateExistingBricks()     // 기존 벽돌의 물리 속성 업데이트
+
+    // UI 컨트롤
+    resetToDefaults()          // 기본값 복원
+    togglePanel()              // 패널 접기/펼치기
+}
+```
+
+**실시간 물리 업데이트 메커니즘**:
+```javascript
+// 공 질량 변경 시
+const newDensity = CONFIG.BALL.MASS / ballArea;
+fixture.setDensity(newDensity);
+ball.body.resetMassData();  // Box2D에 질량 재계산 요청
+
+// 벽돌 속성 변경 시
+fixture.setDensity(newDensity);
+fixture.setRestitution(CONFIG.BRICK.RESTITUTION);
+fixture.setFriction(CONFIG.BRICK.FRICTION);
+brick.body.setLinearDamping(CONFIG.BRICK.LINEAR_DAMPING);
+brick.body.setAngularDamping(CONFIG.BRICK.ANGULAR_DAMPING);
+brick.body.resetMassData();
+```
+
+#### 5. 물리 충돌 설정 정리
+
+**Box2D 충돌 공식**:
+- **Restitution**: `MAX(물체A, 물체B)`
+- **Friction**: `SQRT(물체A × 물체B)`
+
+**충돌 조합**:
+
+| 충돌 | Restitution | Friction | 결과 |
+|------|-------------|----------|------|
+| **공 ↔ 벽** | MAX(1.0, 1.0) = 1.0 | SQRT(0 × 0) = 0 | 완전 탄성, 마찰 없음 |
+| **공 ↔ 벽돌** | MAX(1.0, 0.9) = 1.0 | SQRT(0 × 0.3) = 0 | 완전 탄성, 마찰 없음 |
+| **벽돌 ↔ 벽** | MAX(0.9, 1.0) = 1.0 | SQRT(0.3 × 0) = 0 | 완전 탄성, 마찰 없음 |
+| **벽돌 ↔ 벽돌** | MAX(0.9, 0.9) = 0.9 | SQRT(0.3 × 0.3) = 0.3 | 90% 탄성, 마찰 있음 |
+
+**핵심 특징**:
+- 공은 항상 완전 탄성 충돌 (에너지 보존)
+- 벽돌이 벽과 부딪히면 100% 반발하지만 Damping으로 점차 안정화
+- 벽돌끼리는 90% 탄성 + 마찰로 안정적으로 쌓임
+
+#### 6. CSS 스타일링
+
+**슬라이더 디자인**:
+- 파란색 그라디언트 thumb (14px 원형)
+- Hover 시 1.2배 확대 애니메이션
+- Glow 효과 (`box-shadow: 0 0 8px rgba(68, 170, 255, 0.6)`)
+
+**패널 스타일**:
+- 반투명 어두운 배경 (`rgba(20, 20, 40, 0.95)`)
+- 부드러운 transition (0.3s ease)
+- 토글 버튼이 패널 오른쪽에 돌출
+
+---
+
 ## 2025-10-01 (Session 2): UI 개선 및 게임플레이 조정
 
 ### 주요 변경 사항
@@ -248,6 +512,174 @@ game-test01/
 │   ├── renderer.js    - Canvas 렌더링 (524줄)
 │   └── main.js        - 진입점 (195줄)
 └── DEVELOPMENT_LOG.md - 이 문서
+```
+
+---
+
+## 물리 설정값 상세 참고
+
+### 🔵 공 (Ball) 물리 설정
+
+#### Body 설정 (physics.js:131-137)
+```javascript
+type: 'dynamic'                    // 동적 바디 (중력/힘 영향 받음)
+position: Vec2(x, y)               // 초기 위치
+linearVelocity: Vec2(vx, vy)       // 초기 속도
+bullet: true                       // CCD 활성화 (고속 충돌 감지)
+fixedRotation: true                // 회전 비활성화 (공은 회전 안 함)
+linearDamping: 0                   // 선형 감쇠 없음 (기본값)
+angularDamping: 0                  // 각 감쇠 없음 (기본값)
+```
+
+#### Fixture 설정 (physics.js:143-148)
+```javascript
+shape: Circle(0.08)                // 반지름 0.08m (8px)
+restitution: 1.0                   // 완전 탄성 충돌 (100% 반발)
+friction: 0                        // 마찰 없음
+density: 9950                      // 계산값 (40 / π×0.08²)
+→ 실제 질량: 40
+```
+
+#### 속도 제한 (physics.js:447-475)
+```javascript
+MAX_SPEED: 7 m/s                   // 최대 속도 (700 px/s)
+MIN_SPEED: 3 m/s                   // 최소 속도 (300 px/s)
+BASE_SPEED: 3.5 m/s                // 기본 속도 (350 px/s)
+SPEED_DECAY: 0.97                  // 감쇠 계수 (3% per step)
+DECAY_THRESHOLD: 4                 // 4 m/s 이상일 때만 감쇠
+```
+
+#### CONFIG 값 (config.js:22-32)
+```javascript
+RADIUS: 0.08 m                     // 8px
+SPEED: 3.5 m/s                     // 초기 속도
+MASS: 40                           // 목표 질량
+LAUNCH_ANGLE_VARIATION: 30°        // 발사 각도 랜덤 범위 (±30°)
+```
+
+---
+
+### 🟥 벽돌 (Brick) 물리 설정
+
+#### Body 설정 (physics.js:190-197)
+```javascript
+type: 'dynamic'                    // 동적 바디 (밀림/회전 가능)
+position: Vec2(x, y)               // 초기 위치
+fixedRotation: false               // 회전 허용 ⭐
+linearDamping: 1.0                 // 선형 감쇠 (빠른 안정화)
+angularDamping: 1.0                // 각 감쇠 (회전 억제)
+bullet: true                       // CCD 활성화 (겹침 방지)
+```
+
+#### Fixture 설정 (physics.js:205-217)
+```javascript
+shape: Box(0.275, 0.09)            // 반폭×반높이 (0.55×0.18)
+restitution: 0.9                   // 90% 반발 (약간 비탄성)
+friction: 0.3                      // 마찰 계수 (벽돌간 안정화)
+density: 10101                     // 계산값 (1000 / 0.55×0.18)
+→ 실제 질량: 1000
+```
+
+#### CONFIG 값 (config.js:50-70)
+```javascript
+WIDTH: 0.55 m                      // 55px
+HEIGHT: 0.18 m                     // 18px
+MASS: 1000                         // 목표 질량
+RESTITUTION: 0.9                   // 반발 계수
+FRICTION: 0.3                      // 마찰 계수
+LINEAR_DAMPING: 1.0                // 선형 감쇠
+ANGULAR_DAMPING: 1.0               // 각 감쇠
+DESTROY_DELAY: 0.15 sec            // 파괴 지연 시간
+DESTROY_ALPHA: 0.5                 // 파괴 중 투명도
+```
+
+---
+
+### 📊 비교표
+
+| 속성 | 공 (Ball) | 벽돌 (Brick) | 비고 |
+|------|-----------|-------------|------|
+| **타입** | dynamic | dynamic | 둘 다 동적 |
+| **질량** | 40 | 1000 | 비율 1:25 |
+| **반발력** | 1.0 (100%) | 0.9 (90%) | 공은 완전탄성 |
+| **마찰** | 0 | 0.3 | 벽돌만 마찰 있음 |
+| **회전** | ❌ 불가 | ✅ 가능 | 핵심 차이점! |
+| **CCD** | ✅ | ✅ | 둘 다 활성화 |
+| **선형 감쇠** | 0 | 1.0 | 벽돌만 감쇠 |
+| **각 감쇠** | 0 | 1.0 | 벽돌만 감쇠 |
+
+---
+
+### 🎯 핵심 차이점
+
+**1. 회전 (Rotation)**
+- **공**: `fixedRotation: true` - 회전 불가
+- **벽돌**: `fixedRotation: false` - 회전 가능 ⭐
+
+**2. 탄성 (Elasticity)**
+- **공**: `restitution: 1.0` - 완전 탄성 (에너지 보존)
+- **벽돌**: `restitution: 0.9` - 약간 비탄성 (충격 흡수)
+
+**3. 감쇠 (Damping)**
+- **공**: 없음 (계속 움직임)
+- **벽돌**: 1.0 (빠르게 안정화)
+
+**4. 마찰 (Friction)**
+- **공**: 0 (미끄러움)
+- **벽돌**: 0.3 (벽돌끼리 미끄러지지 않음)
+
+---
+
+### 🔬 실제 계산값
+
+**공 Density 계산**
+```
+면적 = π × r² = π × 0.08² = 0.0201 m²
+density = mass / area = 40 / 0.0201 ≈ 9,950
+```
+
+**벽돌 Density 계산**
+```
+면적 = w × h = 0.55 × 0.18 = 0.099 m²
+density = mass / area = 1000 / 0.099 ≈ 10,101
+```
+
+**관성 모멘트 (Inertia)**
+- **공**: `I = m × r² = 40 × 0.08² = 0.256`
+- **벽돌**: `I = m × (w² + h²) / 12 = 1000 × (0.55² + 0.18²) / 12 ≈ 27.9`
+
+---
+
+### 💡 조정 가이드
+
+**벽돌을 더 많이 움직이게 하려면:**
+```javascript
+BRICK.MASS: 1000 → 500           // 가볍게
+BRICK.LINEAR_DAMPING: 1.0 → 0.5  // 감쇠 줄이기
+```
+
+**벽돌 회전을 더 크게 하려면:**
+```javascript
+BRICK.ANGULAR_DAMPING: 1.0 → 0.5 // 감쇠 줄이기
+```
+
+**공을 더 무겁게 하려면:**
+```javascript
+BALL.MASS: 40 → 60               // 벽돌 더 많이 밀림
+// 주의: 비율 유지하려면 BRICK.MASS도 조정 (1:25)
+```
+
+**물리 안정성 vs 자연스러움 트레이드오프:**
+```javascript
+// 더 안정적 (덜 움직임)
+VELOCITY_ITERATIONS: 10 → 12
+POSITION_ITERATIONS: 8 → 10
+BRICK.LINEAR_DAMPING: 1.0 → 2.0
+
+// 더 자연스러움 (더 움직임, 불안정 가능)
+VELOCITY_ITERATIONS: 10 → 8
+POSITION_ITERATIONS: 8 → 6
+BRICK.LINEAR_DAMPING: 1.0 → 0.5
 ```
 
 ---

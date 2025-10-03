@@ -5,20 +5,25 @@ class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        
-        // Set canvas size
-        this.canvas.width = CONFIG.CANVAS_WIDTH;
-        this.canvas.height = CONFIG.CANVAS_HEIGHT;
-        
+
+        // Set initial canvas size
+        this.updateCanvasSize();
+
         // Enable anti-aliasing
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'high';
-        
+
         // Cache for performance
         this.gradientCache = {};
         this.setupGradients();
     }
-    
+
+    // Update canvas size (for responsive behavior)
+    updateCanvasSize() {
+        this.canvas.width = CONFIG.CANVAS_WIDTH;
+        this.canvas.height = CONFIG.CANVAS_HEIGHT;
+    }
+
     // Setup cached gradients
     setupGradients() {
         // Background gradient
@@ -26,7 +31,7 @@ class Renderer {
         this.gradientCache.background.addColorStop(0, CONFIG.COLORS.BG_GRADIENT[0]);
         this.gradientCache.background.addColorStop(0.5, CONFIG.COLORS.BG_GRADIENT[1]);
         this.gradientCache.background.addColorStop(1, CONFIG.COLORS.BG_GRADIENT[2]);
-        
+
         // Center wave effect (aligned with paddle center)
         const paddleCenter = (Utils.toPixels(CONFIG.PADDLE.PLAYER_Y) + Utils.toPixels(CONFIG.PADDLE.AI_Y)) / 2;
         this.gradientCache.wave = this.ctx.createLinearGradient(
@@ -36,6 +41,13 @@ class Renderer {
         this.gradientCache.wave.addColorStop(0, 'rgba(100, 200, 255, 0)');
         this.gradientCache.wave.addColorStop(0.5, 'rgba(100, 200, 255, 0.1)');
         this.gradientCache.wave.addColorStop(1, 'rgba(100, 200, 255, 0)');
+    }
+
+    // Resize handler - updates canvas and gradients
+    resize() {
+        CONFIG.updateCanvasSize();
+        this.updateCanvasSize();
+        this.setupGradients();
     }
     
     // Main render function
@@ -232,52 +244,22 @@ class Renderer {
     // Draw balls
     drawBalls(physics) {
         const balls = physics.getEntitiesOfType('ball');
-        
+
         balls.forEach(ball => {
             const pos = ball.body.getPosition();
             const x = Utils.toPixels(pos.x);
             const y = Utils.toPixels(pos.y);
             const r = Utils.toPixels(CONFIG.BALL.RADIUS);
-            
-            // Draw ball with shadow
+
+            // Draw ball - simple solid circle
             this.ctx.save();
-            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-            this.ctx.shadowBlur = 3;
-            this.ctx.shadowOffsetX = 1;
-            this.ctx.shadowOffsetY = 1;
-            
+
             // Draw ball
             this.ctx.beginPath();
             this.ctx.arc(x, y, r, 0, Math.PI * 2);
             this.ctx.fillStyle = CONFIG.COLORS.BALL;
             this.ctx.fill();
-            
-            // Reset shadow
-            this.ctx.shadowColor = 'transparent';
-            
-            // Add shine
-            const shine = this.ctx.createRadialGradient(
-                x - r * 0.3, y - r * 0.3, 0,
-                x - r * 0.3, y - r * 0.3, r * 0.7
-            );
-            shine.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-            shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, r, 0, Math.PI * 2);
-            this.ctx.fillStyle = shine;
-            this.ctx.fill();
-            
-            // Add glow effect
-            const glow = this.ctx.createRadialGradient(x, y, r, x, y, r * 2.5);
-            glow.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-            glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
-            this.ctx.fillStyle = glow;
-            this.ctx.fill();
-            
+
             this.ctx.restore();
         });
     }

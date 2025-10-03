@@ -7,13 +7,14 @@ class MirrorBreakout {
         this.physics = null;
         this.game = null;
         this.renderer = null;
-        
+        this.uiControls = null;
+
         this.animationId = null;
         this.lastTime = 0;
-        
+
         this.button = null;
     }
-    
+
     // Initialize the game
     init() {
         // Get canvas
@@ -22,27 +23,58 @@ class MirrorBreakout {
             console.error('Canvas element not found');
             return;
         }
-        
+
         // Get button
         this.button = document.getElementById('gameButton');
         if (!this.button) {
             console.error('Button element not found');
             return;
         }
-        
+
         // Create game systems
         this.physics = new PhysicsEngine();
         this.game = new GameManager(this.physics);
         this.renderer = new Renderer(this.canvas);
-        
+        this.uiControls = new UIControls(CONFIG, this.physics);
+
         // Initialize game
         this.game.init();
-        
+
         // Initial render
         this.renderer.render(this.physics, this.game);
-        
+
         // Setup button handler
         this.button.onclick = () => this.toggleGame();
+
+        // Setup window resize handler
+        this.setupResizeHandler();
+    }
+
+    // Setup responsive resize handler
+    setupResizeHandler() {
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            // Debounce resize events (wait 200ms after last resize)
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // Only resize if not playing
+                if (this.game.state.phase === 'menu' || this.game.state.phase === 'over') {
+                    this.handleResize();
+                }
+            }, 200);
+        });
+    }
+
+    // Handle window resize
+    handleResize() {
+        // Update renderer
+        this.renderer.resize();
+
+        // Re-initialize game with new dimensions
+        this.game.init();
+
+        // Re-render
+        this.renderer.render(this.physics, this.game);
     }
     
     // Toggle game state
@@ -173,7 +205,8 @@ function initGame() {
     // Check if all required classes are loaded
     if (typeof PhysicsEngine === 'undefined' ||
         typeof GameManager === 'undefined' ||
-        typeof Renderer === 'undefined') {
+        typeof Renderer === 'undefined' ||
+        typeof UIControls === 'undefined') {
         console.error('Required game modules not loaded');
         return;
     }
