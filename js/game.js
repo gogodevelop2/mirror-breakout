@@ -48,21 +48,12 @@ class GameManager {
             splitEffect: null,
             spawnEffects: []
         };
-        
-        // Input
+
+        // Input (managed by GameScene)
         this.keys = {};
-        this.setupInput();
-    }
-    
-    // Setup keyboard input
-    setupInput() {
-        window.addEventListener('keydown', (e) => {
-            this.keys[e.key] = true;
-        });
-        
-        window.addEventListener('keyup', (e) => {
-            this.keys[e.key] = false;
-        });
+
+        // Timers for cleanup
+        this.timers = [];
     }
     
     // Initialize new game
@@ -143,30 +134,37 @@ class GameManager {
     // Create initial bricks (상하 대칭 구조)
     createInitialBricks() {
         const pattern = this.generateRandomPattern();
-        
+
         // 벽돌 그룹 전체 너비 계산
         const totalBricksWidth = CONFIG.BRICK.COLS * CONFIG.BRICK.WIDTH +
                                  (CONFIG.BRICK.COLS - 1) * CONFIG.BRICK.GAP_X;
         // 중앙 정렬을 위한 시작 X 위치
         const startX = (CONFIG.WORLD_WIDTH - totalBricksWidth) / 2;
-        
+
+        let playerBrickCount = 0;
+        let aiBrickCount = 0;
+
         for (let row = 0; row < CONFIG.BRICK.ROWS; row++) {
             for (let col = 0; col < CONFIG.BRICK.COLS; col++) {
                 const index = row * CONFIG.BRICK.COLS + col;
                 if (!pattern[index]) continue;
-                
+
                 // Calculate x position (centered)
                 const x = startX + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X) + CONFIG.BRICK.WIDTH/2;
-                
+
                 // Player가 깨야 할 벽돌 (위쪽) - playerTargetBricks
                 const topY = CONFIG.BRICK.PLAYER_BRICKS_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
                 this.physics.createBrick(x, topY, row, col, true);  // isPlayerTarget = true
-                
+                playerBrickCount++;
+
                 // AI가 깨야 할 벽돌 (아래쪽) - aiTargetBricks
                 const bottomY = CONFIG.BRICK.AI_BRICKS_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
                 this.physics.createBrick(x, bottomY, row, col, false);  // isPlayerTarget = false
+                aiBrickCount++;
             }
         }
+
+        console.log(`[Init] Created ${playerBrickCount} player bricks, ${aiBrickCount} AI bricks`);
     }
     
     // Generate random brick pattern
@@ -415,9 +413,10 @@ class GameManager {
                     brick.destroyStartTime = Date.now();
 
                     // Schedule removal after delay
-                    setTimeout(() => {
+                    const timerId = setTimeout(() => {
                         this.physics.removeEntity(collision.brickId);
                     }, CONFIG.BRICK.DESTROY_DELAY * 1000);
+                    this.timers.push(timerId);
                 }
             }
         });
@@ -604,8 +603,9 @@ class GameManager {
     checkGameOver() {
         const playerTargetBricks = this.physics.getEntitiesOfType('playerTargetBrick').length;
         const aiTargetBricks = this.physics.getEntitiesOfType('aiTargetBrick').length;
-        
+
         if (playerTargetBricks === 0 || aiTargetBricks === 0) {
+            console.log(`[GameOver] Player bricks: ${playerTargetBricks}, AI bricks: ${aiTargetBricks}`);
             this.state.phase = 'over';
             // Player wins if all player target bricks are destroyed
             this.state.playerWon = (playerTargetBricks === 0);

@@ -6,6 +6,10 @@ class Renderer {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
 
+        if (!this.ctx) {
+            throw new Error('Failed to get 2D context from canvas');
+        }
+
         // Set initial canvas size
         this.updateCanvasSize();
 
@@ -108,7 +112,8 @@ class Renderer {
         const playerTargetBricks = physics.getEntitiesOfType('playerTargetBrick');
         const aiTargetBricks = physics.getEntitiesOfType('aiTargetBrick');
 
-        [...playerTargetBricks, ...aiTargetBricks].forEach(brick => {
+        // Render function to avoid array spreading and duplication
+        const renderBrick = (brick) => {
             const pos = brick.body.getPosition();
             const angle = brick.body.getAngle();  // Get rotation angle
             const x = Utils.toPixels(pos.x);
@@ -161,7 +166,11 @@ class Renderer {
 
             // Restore context
             this.ctx.restore();
-        });
+        };
+
+        // Render each brick type separately (no array spreading)
+        playerTargetBricks.forEach(renderBrick);
+        aiTargetBricks.forEach(renderBrick);
     }
     
     // Draw paddles

@@ -3,8 +3,9 @@
 
 // Calculate responsive canvas size
 function calculateCanvasSize() {
-    const maxWidth = window.innerWidth - 280;  // Account for settings panel (220px) + gap
-    const maxHeight = window.innerHeight * 0.85;  // Use 85% of viewport height
+    const padding = 40;  // body padding 20px * 2 (top+bottom or left+right)
+    const maxWidth = window.innerWidth - padding;
+    const maxHeight = window.innerHeight - padding;
 
     // Maintain 6:7 aspect ratio (width:height)
     const aspectRatio = 6 / 7;
@@ -154,6 +155,42 @@ const CONFIG = {
     
     // Visual settings
     CORNER_RADIUS: 20,
+
+    // UI Layout (pixels)
+    UI_LAYOUT: {
+        BUTTON: {
+            DEFAULT_WIDTH: 200,
+            DEFAULT_HEIGHT: 60,
+            MENU_WIDTH: 200,
+            MENU_HEIGHT: 60,
+            GAMEOVER_WIDTH: 180,
+            GAMEOVER_HEIGHT: 60,
+            SETTINGS_WIDTH: 200,
+            SETTINGS_HEIGHT: 50,
+            VERTICAL_SPACING: 80,
+            HORIZONTAL_GAP: 20
+        },
+        MENU: {
+            TITLE_Y_RATIO: 0.25,  // 화면 상단 25% 위치
+            BUTTON_START_Y_OFFSET: 60,
+            BUTTON_SPACING: 80
+        },
+        GAMEOVER: {
+            TITLE_Y_OFFSET: -150,
+            SCOREBOARD_Y_OFFSET: -50,
+            TIME_Y_OFFSET: 100,
+            BUTTON_Y_OFFSET: 180
+        },
+        SETTINGS: {
+            TITLE_Y: 60,
+            SUBTITLE_Y: 100,
+            SLIDER_START_Y: 140,
+            SLIDER_SPACING: 60,
+            BUTTON_BOTTOM_MARGIN: 80,
+            COLUMN_WIDTH: 230,
+            COLUMN_GAP: 40
+        }
+    },
 
     // Game zones (meters)
     ZONES: {

@@ -7,6 +7,7 @@ class PhysicsEngine {
         this.entities = new Map();  // Store all entities with IDs
         this.nextId = 1;
         this.collisionCallbacks = [];
+        this.nextFrameCallbacks = [];  // Callbacks to run after physics step
     }
     
     // Initialize world
@@ -310,7 +311,7 @@ class PhysicsEngine {
             const paddleData = dataA.type === 'ball' ? dataB : dataA;
             const paddleEntity = this.entities.get(paddleData.id);
             
-            if (paddleEntity) {
+            if (paddleEntity && paddleEntity.body) {
                 // Calculate paddle momentum
                 const paddlePos = paddleEntity.body.getPosition();
                 const paddleMomentum = (paddlePos.x - paddleEntity.prevX) / CONFIG.TIMESTEP;
@@ -353,22 +354,22 @@ class PhysicsEngine {
             // Store pre-collision velocity for angle restoration
             const preCollisionVel = ballBody.getLinearVelocity();
             const preCollisionSpeed = preCollisionVel.length();
-            
-            // Fix collision resolution destroying angles
-            setTimeout(() => {
+
+            // Fix collision resolution destroying angles (after physics step completes)
+            this.nextFrameCallbacks.push(() => {
                 const postVel = ballBody.getLinearVelocity();
                 const postSpeed = postVel.length();
-                
+
                 // Check if collision destroyed the angle (became too vertical or horizontal)
                 const absX = Math.abs(postVel.x);
                 const absY = Math.abs(postVel.y);
                 const ratio = Math.min(absX, absY) / Math.max(absX, absY);
-                
+
                 // If angle became too shallow (ratio < 0.1 means less than ~6 degrees)
                 if (ratio < 0.1 && postSpeed > 0.5) {
                     // Restore some angle based on pre-collision direction
                     const targetSpeed = Math.max(preCollisionSpeed, CONFIG.BALL.BASE_SPEED);
-                    
+
                     let newVelX, newVelY;
                     if (absX < absY) {
                         // Too vertical, add horizontal component
@@ -392,7 +393,7 @@ class PhysicsEngine {
                         postVel.y * boostFactor
                     ));
                 }
-            }, 1);
+            });
             
             this.collisionCallbacks.push({
                 type: 'wallHit'
@@ -402,6 +403,8 @@ class PhysicsEngine {
     
     // Step physics and process callbacks
     step() {
+        if (!this.world) return [];
+
         // Sub-stepping: Break down each frame into smaller steps for more accurate collision detection
         // This prevents tunneling and overlap issues with many dynamic rotating bodies
         const subSteps = 2;  // 2 sub-steps per frame (60fps → 120 physics steps/sec)
@@ -423,10 +426,14 @@ class PhysicsEngine {
         // Limit ball speeds
         this.limitBallSpeeds();
 
+        // Execute next frame callbacks (after physics step completes)
+        this.nextFrameCallbacks.forEach(callback => callback());
+        this.nextFrameCallbacks = [];
+
         // Process collision callbacks
         const callbacks = this.collisionCallbacks.slice();
         this.collisionCallbacks = [];
-        
+
         return callbacks;
     }
     

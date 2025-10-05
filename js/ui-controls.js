@@ -201,4 +201,21 @@ class UIControls {
             this.panel.style.width = '220px';
         }
     }
+
+    destroy() {
+        // Remove event listeners from sliders
+        Object.values(this.sliders).forEach(slider => {
+            if (slider) {
+                const newSlider = slider.cloneNode(true);
+                slider.parentNode.replaceChild(newSlider, slider);
+            }
+        });
+
+        // Clear references
+        this.sliders = {};
+        this.valueDisplays = {};
+        this.panel = null;
+        this.config = null;
+        this.physics = null;
+    }
 }

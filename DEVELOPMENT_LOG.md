@@ -7,6 +7,241 @@
 
 ---
 
+## 2025-10-05 (Session 3): Scene 시스템 구현 및 코드 최적화
+
+### 주요 변경 사항
+
+#### 1. Scene 기반 아키텍처 구현
+
+**목적**: 메뉴, 게임, 게임오버, 설정 화면을 명확히 분리하고 전환 관리
+
+**새로 추가된 파일**:
+- `js/scenes/base-scene.js` - BaseScene 클래스 (공통 기능)
+- `js/scenes/scene-manager.js` - SceneManager (Scene 전환 및 라이프사이클 관리)
+- `js/scenes/menu-scene.js` - MenuScene (타이틀 화면)
+- `js/scenes/game-scene.js` - GameScene (게임 플레이)
+- `js/scenes/gameover-scene.js` - GameOverScene (결과 화면)
+- `js/scenes/settings-scene.js` - SettingsScene (물리 설정)
+
+**Scene 시스템 구조**:
+```javascript
+BaseScene (기본 클래스)
+  ├── MenuScene      - 타이틀 + START/SETTINGS 버튼
+  ├── GameScene      - 게임 플레이 (기존 로직 래핑)
+  ├── GameOverScene  - 승패 결과 + RETRY/MENU 버튼
+  └── SettingsScene  - 물리 설정 슬라이더 + BACK/RESET 버튼
+```
+
+**SceneManager 기능**:
+- Scene 등록 및 전환 (`switchTo()`)
+- 통합 게임 루프 (update/render)
+- 이벤트 관리 (click, mousemove, keyboard, resize)
+- Canvas injection (모든 Scene에 canvas 참조 전달)
+
+**Scene 라이프사이클**:
+```javascript
+onEnter(data)    // Scene 진입 시 (이전 Scene 데이터 전달)
+update(dt)       // 매 프레임 업데이트
+render(ctx)      // Canvas 렌더링
+handleClick(x,y) // 클릭 이벤트
+handleResize()   // 창 크기 변경
+onExit()         // Scene 종료 시 (데이터 반환)
+```
+
+#### 2. Canvas 레이어 분리 (성능 최적화)
+
+**문제**: 정적 배경과 동적 게임 오브젝트가 매 프레임마다 함께 렌더링됨
+
+**해결**: 2개 Canvas 레이어로 분리
+```html
+<div class="game-container">
+    <canvas id="bgCanvas"></canvas>   <!-- z-index: 1, 배경 -->
+    <canvas id="gameCanvas"></canvas> <!-- z-index: 2, 전경(투명) -->
+</div>
+```
+
+**레이어 역할**:
+- **bgCanvas**: 정적/느린 애니메이션 (MenuScene 배경볼, 그라디언트)
+- **gameCanvas**: 동적 게임 오브젝트 (공, 벽돌, 패들, UI)
+
+**CSS 레이어 스타일**:
+```css
+#bgCanvas, #gameCanvas {
+    position: absolute;
+    top: 0; left: 0;
+}
+#bgCanvas { z-index: 1; background: #000; }
+#gameCanvas { z-index: 2; background: transparent; }
+```
+
+**성능 이점**:
+- MenuScene: 배경은 60fps → 필요시만 업데이트
+- GameScene: 배경 한 번만 렌더링 (검은색)
+- SettingsScene: 그라디언트 한 번만 렌더링
+
+#### 3. 코드 최적화 (10개 항목 완료)
+
+**3-1. setTimeout 타이머 정리**
+- **문제**: `setTimeout(() => {...}, 1)` 사용으로 타이밍 불안정
+- **해결**: Next-frame callback queue 방식
+```javascript
+// physics.js
+this.nextFrameCallbacks = [];
+this.nextFrameCallbacks.push(() => { /* 각도 복구 로직 */ });
+
+// step() 끝에서 실행
+this.nextFrameCallbacks.forEach(callback => callback());
+this.nextFrameCallbacks = [];
+```
+
+**3-2. Canvas 조회 반복 최적화**
+- **문제**: 각 Scene에서 `document.getElementById('gameCanvas')` 반복 호출
+- **해결**: Canvas injection (SceneManager → BaseScene)
+```javascript
+// scene-manager.js
+registerScene(name, scene) {
+    scene.setCanvas(this.canvas);
+    scene.setBgCanvas(this.bgCanvas);
+}
+```
+
+**3-3. 배열 스프레드 연산 제거**
+- **문제**: `[...playerBricks, ...aiBricks].forEach()` - 140개 객체 복사 (60fps)
+- **해결**: 함수 추출 + 별도 forEach
+```javascript
+// renderer.js
+const renderBrick = (brick) => { /* ... */ };
+playerTargetBricks.forEach(renderBrick);
+aiTargetBricks.forEach(renderBrick);
+```
+
+**3-4. 버튼 렌더링 로직 중복 제거**
+- **문제**: MenuScene, GameOverScene, SettingsScene에 동일한 `renderButton()` (100줄 중복)
+- **해결**: BaseScene으로 통합
+```javascript
+// base-scene.js
+renderButton(ctx, button) { /* 공통 구현 */ }
+```
+
+**3-5. 버튼 호버 체크 중복 통일**
+- **문제**: main.js의 setupMouseHover()에서 각 Scene 버튼 직접 접근 (45줄)
+- **해결**: BaseScene의 updateButtonHover() + Scene 자체 처리
+```javascript
+// base-scene.js
+updateButtonHover(x, y) {
+    Object.values(this.buttons).forEach(btn => {
+        btn.hovered = (x >= btn.x && ...);
+    });
+}
+
+// scene-manager.js
+handleMouseMove(event) {
+    this.currentScene.handleMouseMove(x, y);
+    this.canvas.style.cursor = isHovering ? 'pointer' : 'default';
+}
+```
+
+**3-6. 버튼 위치 계산 중복 제거 (자동 레이아웃)**
+- **문제**: 각 Scene의 updateButtonPositions()에 중복 코드 (40줄)
+- **해결**: BaseScene의 autoLayoutButtons() 시스템
+```javascript
+// base-scene.js
+autoLayoutButtons(layout, options) {
+    switch (layout) {
+        case 'vertical-center':    // MenuScene
+        case 'horizontal-center':  // GameOverScene
+        case 'horizontal-bottom':  // SettingsScene
+    }
+}
+
+// menu-scene.js
+updateButtonPositions() {
+    this.autoLayoutButtons('vertical-center');  // 3줄로 축약!
+}
+```
+
+**3-7. 백업/테스트 파일 정리**
+- 삭제된 파일 (7개):
+  - `js/main-backup.js`
+  - `js/main-test.js`
+  - `index-backup.html`
+  - `test-phase1.html` ~ `test-phase4.html`
+
+**3-8. 사용되지 않는 CSS 제거**
+- **230줄 → 71줄 (159줄 제거, 69% 감소)**
+- 제거 항목:
+  - `.header`, `h1`, `@keyframes gradientShift`
+  - `#gameButton` (3개 선택자)
+  - `.settings-panel` 및 관련 스타일 전체 (슬라이더, 버튼 등)
+  - 사용하지 않는 반응형 CSS
+- 유지: Orbitron 폰트 (MenuScene Canvas 렌더링에서 사용)
+
+**3-9. Magic Numbers 상수화**
+- **문제**: 60, 80, 180, 200 등 하드코딩된 레이아웃 값
+- **해결**: CONFIG.UI_LAYOUT 추가
+```javascript
+// config.js
+UI_LAYOUT: {
+    BUTTON: {
+        DEFAULT_WIDTH: 200,
+        VERTICAL_SPACING: 80,
+        HORIZONTAL_GAP: 20
+    },
+    MENU: {
+        TITLE_Y_RATIO: 0.25,
+        BUTTON_START_Y_OFFSET: 60
+    },
+    GAMEOVER: {
+        TITLE_Y_OFFSET: -150,
+        BUTTON_Y_OFFSET: 180
+    },
+    SETTINGS: {
+        BUTTON_BOTTOM_MARGIN: 80
+    }
+}
+```
+
+#### 4. UI/UX 개선
+
+**SettingsScene 구현**:
+- 사이드 패널 제거 → Canvas 기반 전체 화면 Scene으로 전환
+- 2단 레이아웃 (Ball 왼쪽, Brick 오른쪽)
+- BACK TO MAIN, RESET 버튼
+
+**GameOverScene 개선**:
+- 승패 표시 (VICTORY/DEFEAT)
+- 스코어보드 바 (플레이어 vs AI)
+- 플레이 시간 표시
+- RETRY, MENU 버튼
+
+**반응형 수정**:
+- `.game-container` 높이 고정 (700px)
+- `body` justifyContent: center → flex-start (상단 패딩 문제 해결)
+
+#### 5. 아키텍처 개선 효과
+
+**관심사 분리**:
+- ✅ Scene별 독립적 로직
+- ✅ SceneManager가 통합 관리
+- ✅ 이벤트 핸들링 중앙화
+
+**코드 재사용**:
+- ✅ BaseScene 공통 기능 (renderButton, updateButtonHover, autoLayoutButtons)
+- ✅ Canvas injection으로 중복 제거
+- ✅ 선언적 레이아웃 시스템
+
+**유지보수성**:
+- ✅ Scene 추가/제거 용이
+- ✅ 레이아웃 값 CONFIG에 집중
+- ✅ 이벤트 리스너 생명주기 명확
+
+**성능**:
+- ✅ 레이어 분리로 렌더링 최적화
+- ✅ 배열 복사 제거
+- ✅ Next-frame callback으로 타이밍 안정화
+
+---
+
 ## 2025-10-03 (Session 2): 반응형 게임 화면 구현
 
 ### 주요 변경 사항
