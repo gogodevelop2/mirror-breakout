@@ -7,6 +7,122 @@
 
 ---
 
+## 2025-10-11 (Session 4): UI/UX 개선 및 물리 밸런싱
+
+### 주요 변경 사항
+
+#### 1. AI 패들 색상 시스템 개선
+**변경**: AI 패들 난이도 색상을 파란색 계열에서 빨간색 계열로 변경
+- **이전**: 0.6 (파란색) → 1.0 (핑크) → 2.0 (빨강) - 플레이어 패들과 혼동
+- **현재**: 0.6 (오렌지) → 1.0 (핑크-빨강) → 2.0 (어두운 빨강)
+- **위치**: `config.js:223-246` - `getAIDifficultyColor()` 함수
+
+#### 2. Settings Scene 슬라이더 인터랙션 버그 수정
+**문제**: 슬라이더 클릭/드래그 종료가 제대로 안 되어 계속 마우스를 추적
+**원인**: `click` 이벤트와 `mouseup` 이벤트 충돌, canvas 밖 mouseup 감지 실패
+**해결**:
+- `mousedown` 이벤트 분리: 슬라이더는 `mousedown`으로 시작, 버튼은 `click`으로 처리
+- `mouseup` 이벤트를 canvas → window로 변경 (canvas 밖에서도 감지)
+- **수정 파일**: `scene-manager.js`, `settings-scene.js`
+
+#### 3. Settings Scene Canvas UI 최적화
+**목적**: 매 프레임 렌더링 성능 개선 (6개 슬라이더 × 60fps)
+
+**최적화 항목**:
+1. **Bounds 계산 분리**: `renderSlider()`에서 제거 → `updateSliderBounds()`로 분리 (onEnter/resize 시에만)
+2. **슬라이더 순회 조기 종료**: `forEach` → `for...of` + `return`
+3. **그라디언트 캐싱**: 슬라이더 thumb 그라디언트를 한 번만 생성하여 재사용
+4. **console.log 제거**: 드래그 중 매 프레임 출력 제거
+5. **불필요한 클램핑 제거**: ratio가 이미 0-1로 제한되어 중복 체크 제거
+
+**성능 개선**:
+- 그라디언트 생성: 360회/초 → 1회 (Scene 생성 시)
+- Bounds 계산: 6회/프레임 → Scene 진입/리사이즈 시에만
+
+#### 4. 반응형 Settings Scene 구현
+**문제**: 창 크기가 작아지면 슬라이더가 겹치거나 잘림
+
+**해결**: 레이아웃 모드 자동 전환 (BREAKPOINT_WIDTH: 500px)
+- **2컬럼 레이아웃** (≥ 500px): Ball(좌) / Brick(우)
+- **1컬럼 레이아웃** (< 500px): 세로 배치, 작은 폰트/간격
+
+**반응형 조정**:
+- Title: 48px → 32px (작은 화면)
+- 슬라이더 간격: 60px → 45px
+- 슬라이더 너비: 화면의 85% (최대 280px)
+- 버튼 크기: 85% 축소
+
+**구현 메서드**:
+- `updateSliderBoundsDoubleColumn()` / `updateSliderBoundsSingleColumn()`
+- `renderDoubleColumn()` / `renderSingleColumn()`
+
+#### 5. 반응형 레이아웃 버그 수정
+**문제**: `.game-container` 고정 높이(700px)로 인해 작은 화면에서 하단 빈 공간 발생
+**해결**: `styles.css` 수정
+```css
+.game-container {
+    height: auto;  /* 700px → auto */
+}
+```
+
+#### 6. Settings Scene 속성 한글화
+**변경**: 모든 슬라이더 라벨에 한글 추가
+- Mass (질량)
+- Speed (속도)
+- Bounce (반발력)
+- Damping (감쇠)
+
+#### 7. Settings Scene 속성 조정
+**Brick Friction 제거 이유**:
+- 마찰은 벽돌끼리 충돌할 때만 작용 (`SQRT(0.3 × 0.3) = 0.3`)
+- 공의 friction = 0이므로 공 ↔ 벽돌 충돌에는 영향 없음
+- 게임플레이에서 의미 없는 속성
+
+**Paddle Momentum Transfer 제거 이유**:
+- 공의 속도 감쇠 시스템(SPEED_DECAY)으로 효과가 즉시 상쇄됨
+- 물리 밸런싱으로 해결 (아래 참고)
+
+**Damping 범위 수정**:
+- **이전**: 0.5 ~ 2.0 (물리적으로 비현실적)
+- **현재**: 0 ~ 1.0 (물리적으로 올바른 범위)
+
+**최종 Settings 구성**:
+- ⚪ Ball: Mass, Speed (2개)
+- 🟦 Brick: Mass, Bounce, Damping (3개)
+- **총 5개 슬라이더**
+
+#### 8. 공 속도 물리 밸런싱
+**문제**: 패들 운동량 전달(MOMENTUM_TRANSFER)이 즉시 감쇠되어 효과를 느낄 수 없음
+
+**원인**:
+- `SPEED_DECAY: 0.97` - 60fps 기준 초당 84% 손실, 0.5초 안에 BASE_SPEED로 복귀
+- `DECAY_THRESHOLD: 4` - 4 m/s 이상에서 즉시 감쇠 시작
+- 패들 충돌로 4.7 m/s가 되어도 즉시 3.5 m/s로 복귀
+
+**해결** (`config.js`):
+```javascript
+SPEED_DECAY: 0.97 → 0.99      // 3% → 1% 감쇠 (천천히)
+DECAY_THRESHOLD: 4 → 5         // 5 m/s 이상에서만 감쇠
+```
+
+**효과**:
+- 초당 속도 손실: 84% → 45% (훨씬 느린 감쇠)
+- 패들 운동량 효과 지속 시간: 0.5초 → 2~3초
+- 3~5 m/s 구간: 감쇠 없이 자유롭게 움직임 (다이나믹한 게임플레이)
+- 5 m/s 이상: 천천히 감쇠 (게임 템포 유지)
+
+#### 9. 물리 시스템 이해 개선
+**Kinematic Body (패들) 특성 확인**:
+- 질량 없음 (무한 질량처럼 작동)
+- 반발력(restitution) 설정 가능하지만 공의 1.0이 우선 적용되어 실질적 의미 없음
+- 코드로 직접 제어, 다른 물체가 밀 수 없음
+
+**Box2D 충돌 공식**:
+- Restitution: `MAX(물체A, 물체B)`
+- Friction: `SQRT(물체A × 물체B)`
+
+---
+
 ## 2025-10-05 (Session 3): Scene 시스템 구현 및 코드 최적화
 
 ### 주요 변경 사항

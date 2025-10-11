@@ -25,6 +25,7 @@ class SceneManager {
 
         // Event handlers (bound to this instance)
         this.boundHandleClick = this.handleClick.bind(this);
+        this.boundHandleMouseDown = this.handleMouseDown.bind(this);
         this.boundHandleMouseMove = this.handleMouseMove.bind(this);
         this.boundHandleMouseUp = this.handleMouseUp.bind(this);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
@@ -162,8 +163,11 @@ class SceneManager {
         this.canvas.addEventListener('click', this.boundHandleClick);
 
         // Canvas mouse events
+        this.canvas.addEventListener('mousedown', this.boundHandleMouseDown);
         this.canvas.addEventListener('mousemove', this.boundHandleMouseMove);
-        this.canvas.addEventListener('mouseup', this.boundHandleMouseUp);
+
+        // Mouse up on window to catch releases outside canvas
+        window.addEventListener('mouseup', this.boundHandleMouseUp);
 
         // Keyboard events
         window.addEventListener('keydown', this.boundHandleKeyDown);
@@ -188,6 +192,21 @@ class SceneManager {
         const y = event.clientY - rect.top;
 
         this.currentScene.handleClick(x, y);
+    }
+
+    /**
+     * Handle mouse down events
+     */
+    handleMouseDown(event) {
+        if (!this.currentScene) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        if (this.currentScene.handleMouseDown) {
+            this.currentScene.handleMouseDown(x, y);
+        }
     }
 
     /**
@@ -258,8 +277,9 @@ class SceneManager {
 
         // Remove event listeners
         this.canvas.removeEventListener('click', this.boundHandleClick);
+        this.canvas.removeEventListener('mousedown', this.boundHandleMouseDown);
         this.canvas.removeEventListener('mousemove', this.boundHandleMouseMove);
-        this.canvas.removeEventListener('mouseup', this.boundHandleMouseUp);
+        window.removeEventListener('mouseup', this.boundHandleMouseUp);
         window.removeEventListener('keydown', this.boundHandleKeyDown);
         window.removeEventListener('keyup', this.boundHandleKeyUp);
         window.removeEventListener('resize', this.boundHandleResizeDebounced);

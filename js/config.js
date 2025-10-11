@@ -61,8 +61,8 @@ const CONFIG = {
         MAX_SPEED: 7,      // Maximum speed (700 px/s)
         MIN_SPEED: 3,      // Minimum speed (300 px/s)
         BASE_SPEED: 3.5,   // Base speed to return to (350 px/s)
-        SPEED_DECAY: 0.97, // Speed decay factor (3% per physics step when above base)
-        DECAY_THRESHOLD: 4, // Only decay when speed > this value
+        SPEED_DECAY: 0.99, // Speed decay factor (1% per physics step when above base)
+        DECAY_THRESHOLD: 5, // Only decay when speed > this value
         MASS: 100,         // Target mass for ball (ball:brick ratio 1:10, brick=1000)
         LAUNCH_ANGLE_VARIATION: 30  // Random angle variation in degrees (±30°)
     },
@@ -219,29 +219,31 @@ const Utils = {
         return `hsl(${hue + row * 10}, 70%, 50%)`;
     },
     
-    // Calculate AI paddle color based on difficulty
+    // Calculate AI paddle color based on difficulty (red spectrum only)
     getAIDifficultyColor(multiplier) {
         if (multiplier <= 0.6) {
-            return '#4488ff';  // Easy - blue
+            return '#ff8866';  // Easy - light coral/orange
         } else if (multiplier <= 1.0) {
-            // Normal - blue to pink transition
+            // Normal - coral to pink-red transition
             const t = (multiplier - 0.6) / 0.4;
-            const r = Math.round(68 + 187 * t);
+            const r = 255;
             const g = Math.round(136 - 68 * t);
-            const b = Math.round(255 - 119 * t);
+            const b = Math.round(102 + 34 * t);
             return `rgb(${r}, ${g}, ${b})`;
         } else if (multiplier <= 1.5) {
-            // Hard - pink to red
+            // Hard - pink-red to bright red
             const t = (multiplier - 1.0) / 0.5;
             const r = 255;
             const g = Math.round(68 - 68 * t);
-            const b = Math.round(136 - 136 * t);
+            const b = Math.round(136 - 68 * t);
             return `rgb(${r}, ${g}, ${b})`;
         } else {
-            // Extreme - dark red
+            // Extreme - bright red to dark red
             const t = Math.min((multiplier - 1.5) / 0.5, 1);
-            const r = Math.round(200 - 50 * t);
-            return `rgb(${r}, 0, 0)`;
+            const r = Math.round(255 - 51 * t);
+            const g = 0;
+            const b = Math.round(68 * (1 - t));
+            return `rgb(${r}, ${g}, ${b})`;
         }
     },
     

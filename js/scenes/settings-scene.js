@@ -7,12 +7,11 @@ class SettingsScene extends BaseScene {
 
         // Sliders configuration
         this.sliders = {
-            ballMass: { label: 'Mass', min: 20, max: 160, value: 100, step: 5, unit: '', key: 'BALL.MASS' },
-            ballSpeed: { label: 'Speed', min: 2.5, max: 5.0, value: 3.5, step: 0.1, unit: 'm/s', key: 'BALL.SPEED' },
-            brickMass: { label: 'Mass', min: 500, max: 2000, value: 1000, step: 50, unit: '', key: 'BRICK.MASS' },
-            brickRestitution: { label: 'Bounce', min: 0.5, max: 1.0, value: 0.9, step: 0.05, unit: '', key: 'BRICK.RESTITUTION' },
-            brickFriction: { label: 'Friction', min: 0, max: 0.8, value: 0.3, step: 0.05, unit: '', key: 'BRICK.FRICTION' },
-            brickDamping: { label: 'Damping', min: 0.5, max: 2.0, value: 1.0, step: 0.1, unit: '', key: 'BRICK.LINEAR_DAMPING' }
+            ballMass: { label: 'Mass (질량)', min: 20, max: 160, value: 100, step: 5, unit: '', key: 'BALL.MASS' },
+            ballSpeed: { label: 'Speed (속도)', min: 2.5, max: 5.0, value: 3.5, step: 0.1, unit: 'm/s', key: 'BALL.SPEED' },
+            brickMass: { label: 'Mass (질량)', min: 500, max: 2000, value: 1000, step: 50, unit: '', key: 'BRICK.MASS' },
+            brickRestitution: { label: 'Bounce (반발력)', min: 0.5, max: 1.0, value: 0.9, step: 0.05, unit: '', key: 'BRICK.RESTITUTION' },
+            brickDamping: { label: 'Damping (감쇠)', min: 0, max: 1.0, value: 1.0, step: 0.1, unit: '', key: 'BRICK.LINEAR_DAMPING' }
         };
 
         // Buttons
@@ -46,6 +45,13 @@ class SettingsScene extends BaseScene {
         Object.keys(this.sliders).forEach(key => {
             this.defaults[key] = this.sliders[key].value;
         });
+
+        // Cached gradients
+        this.thumbGradientCache = null;
+
+        // Layout mode
+        this.layoutMode = 'double'; // 'double' or 'single'
+        this.BREAKPOINT_WIDTH = 500; // px
     }
 
     onEnter(data) {
@@ -61,10 +67,10 @@ class SettingsScene extends BaseScene {
         this.sliders.ballSpeed.value = CONFIG.BALL.SPEED;
         this.sliders.brickMass.value = CONFIG.BRICK.MASS;
         this.sliders.brickRestitution.value = CONFIG.BRICK.RESTITUTION;
-        this.sliders.brickFriction.value = CONFIG.BRICK.FRICTION;
         this.sliders.brickDamping.value = CONFIG.BRICK.LINEAR_DAMPING;
 
         this.updateButtonPositions();
+        this.updateSliderBounds();
     }
 
     /**
@@ -86,8 +92,127 @@ class SettingsScene extends BaseScene {
     }
 
     updateButtonPositions() {
-        // Use auto-layout for horizontal-bottom pattern
-        this.autoLayoutButtons('horizontal-bottom');
+        const width = this.canvas ? this.canvas.width : CONFIG.CANVAS_WIDTH;
+        const height = this.canvas ? this.canvas.height : CONFIG.CANVAS_HEIGHT;
+
+        // Adjust button size for small screens
+        const buttonScale = width < this.BREAKPOINT_WIDTH ? 0.85 : 1.0;
+        const buttonSpacing = width < this.BREAKPOINT_WIDTH ? 15 : 20;
+
+        this.buttons.back.width = Math.floor(180 * buttonScale);
+        this.buttons.reset.width = Math.floor(200 * buttonScale);
+        this.buttons.back.height = Math.floor(50 * buttonScale);
+        this.buttons.reset.height = Math.floor(50 * buttonScale);
+
+        // Position buttons at bottom center
+        const totalWidth = this.buttons.back.width + buttonSpacing + this.buttons.reset.width;
+        const startX = (width - totalWidth) / 2;
+        const buttonY = height - (width < this.BREAKPOINT_WIDTH ? 60 : 80);
+
+        this.buttons.back.x = startX;
+        this.buttons.back.y = buttonY;
+
+        this.buttons.reset.x = startX + this.buttons.back.width + buttonSpacing;
+        this.buttons.reset.y = buttonY;
+    }
+
+    updateSliderBounds() {
+        const width = this.canvas ? this.canvas.width : CONFIG.CANVAS_WIDTH;
+        const height = this.canvas ? this.canvas.height : CONFIG.CANVAS_HEIGHT;
+
+        // Determine layout mode based on width
+        this.layoutMode = width < this.BREAKPOINT_WIDTH ? 'single' : 'double';
+
+        if (this.layoutMode === 'single') {
+            this.updateSliderBoundsSingleColumn(width, height);
+        } else {
+            this.updateSliderBoundsDoubleColumn(width, height);
+        }
+    }
+
+    updateSliderBoundsDoubleColumn(width, height) {
+        const centerX = width / 2;
+        const sliderKeys = Object.keys(this.sliders);
+        const leftColumn = sliderKeys.slice(0, 2);  // Ball Mass, Speed
+        const rightColumn = sliderKeys.slice(2);    // Brick Mass, Bounce, Damping
+
+        let yPos = 140 + 35; // Title + section header
+        const columnWidth = 230;
+        const columnGap = 40;
+        const leftX = centerX - columnWidth - (columnGap / 2);
+        const rightX = centerX + (columnGap / 2);
+        const sliderSpacing = 60;
+        const sliderWidth = columnWidth - 60;
+        const thumbRadius = 10;
+        const sliderHeight = 4;
+
+        // Ball section (left column)
+        leftColumn.forEach(key => {
+            const trackY = yPos + 18;
+            this.sliders[key].bounds = {
+                x: leftX,
+                y: trackY - thumbRadius,
+                width: sliderWidth,
+                height: thumbRadius * 2 + sliderHeight
+            };
+            yPos += sliderSpacing;
+        });
+
+        // Brick section (right column)
+        yPos = 140 + 35;
+        rightColumn.forEach(key => {
+            const trackY = yPos + 18;
+            this.sliders[key].bounds = {
+                x: rightX,
+                y: trackY - thumbRadius,
+                width: sliderWidth,
+                height: thumbRadius * 2 + sliderHeight
+            };
+            yPos += sliderSpacing;
+        });
+    }
+
+    updateSliderBoundsSingleColumn(width, height) {
+        const centerX = width / 2;
+        const sliderKeys = Object.keys(this.sliders);
+
+        const titleHeight = 80; // Title + subtitle
+        const sectionHeaderHeight = 25;
+        const sliderSpacing = 45; // Tighter spacing for small screens
+        const columnWidth = Math.min(width * 0.85, 280); // 85% width or max 280px
+        const sliderWidth = columnWidth - 40;
+        const thumbRadius = 10;
+        const sliderHeight = 4;
+        const x = centerX - columnWidth / 2;
+
+        let yPos = titleHeight;
+
+        // Ball section
+        yPos += sectionHeaderHeight;
+        sliderKeys.slice(0, 2).forEach(key => {
+            const trackY = yPos + 18;
+            this.sliders[key].bounds = {
+                x: x,
+                y: trackY - thumbRadius,
+                width: sliderWidth,
+                height: thumbRadius * 2 + sliderHeight
+            };
+            yPos += sliderSpacing;
+        });
+
+        // Brick section
+        yPos += 10; // Gap between sections
+        yPos += sectionHeaderHeight;
+        sliderKeys.slice(2).forEach(key => {
+            const trackY = yPos + 18;
+            this.sliders[key].bounds = {
+                x: x,
+                y: trackY - thumbRadius,
+                width: sliderWidth,
+                height: thumbRadius * 2 + sliderHeight
+            };
+            yPos += sliderSpacing;
+        });
     }
 
     update(deltaTime) {
@@ -97,9 +222,22 @@ class SettingsScene extends BaseScene {
     render(ctx) {
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
-        const centerX = width / 2;
 
         // Background is now rendered to bgCanvas in renderBackground()
+
+        if (this.layoutMode === 'single') {
+            this.renderSingleColumn(ctx, width, height);
+        } else {
+            this.renderDoubleColumn(ctx, width, height);
+        }
+
+        // Buttons
+        this.renderButton(ctx, this.buttons.back);
+        this.renderButton(ctx, this.buttons.reset);
+    }
+
+    renderDoubleColumn(ctx, width, height) {
+        const centerX = width / 2;
 
         // Title
         ctx.fillStyle = '#4af';
@@ -115,8 +253,8 @@ class SettingsScene extends BaseScene {
 
         // Render sliders in two columns
         const sliderKeys = Object.keys(this.sliders);
-        const leftColumn = sliderKeys.slice(0, 2);   // Ball: Mass, Speed
-        const rightColumn = sliderKeys.slice(2);     // Brick: Mass, Bounce, Friction, Damping
+        const leftColumn = sliderKeys.slice(0, 2);  // Ball Mass, Speed
+        const rightColumn = sliderKeys.slice(2);    // Brick Mass, Bounce, Damping
 
         let yPos = 140;
         const columnWidth = 230;
@@ -150,15 +288,65 @@ class SettingsScene extends BaseScene {
             yPos += sliderSpacing;
         });
 
-        // Buttons
-        this.renderButton(ctx, this.buttons.back);
-        this.renderButton(ctx, this.buttons.reset);
-
-        // Footer (moved up to avoid button overlap)
+        // Footer
         ctx.fillStyle = '#666';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Changes apply immediately during gameplay', centerX, height - 110);
+    }
+
+    renderSingleColumn(ctx, width, height) {
+        const centerX = width / 2;
+
+        // Smaller title
+        ctx.fillStyle = '#4af';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PHYSICS SETTINGS', centerX, 40);
+
+        // Smaller subtitle
+        ctx.fillStyle = '#aaa';
+        ctx.font = '13px Arial';
+        ctx.fillText('Adjust physics in real-time', centerX, 65);
+
+        const sliderKeys = Object.keys(this.sliders);
+        const columnWidth = Math.min(width * 0.85, 280);
+        const x = centerX - columnWidth / 2;
+        const sliderSpacing = 45;
+
+        let yPos = 80;
+
+        // Ball section
+        ctx.fillStyle = '#4af';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('⚪ Ball', x, yPos);
+        yPos += 25;
+
+        sliderKeys.slice(0, 2).forEach(key => {
+            this.renderSlider(ctx, key, this.sliders[key], x, yPos, columnWidth);
+            yPos += sliderSpacing;
+        });
+
+        // Brick section
+        yPos += 10;
+        ctx.fillStyle = '#4af';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('🟦 Brick', x, yPos);
+        yPos += 25;
+
+        sliderKeys.slice(2).forEach(key => {
+            this.renderSlider(ctx, key, this.sliders[key], x, yPos, columnWidth);
+            yPos += sliderSpacing;
+        });
+
+        // Footer
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Changes apply immediately', centerX, height - 90);
     }
 
     renderSlider(ctx, key, slider, x, y, width) {
@@ -199,22 +387,27 @@ class SettingsScene extends BaseScene {
         ctx.arc(thumbX + 2, thumbY + 2, thumbRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Thumb
-        const gradient = ctx.createRadialGradient(thumbX, thumbY, 0, thumbX, thumbY, thumbRadius);
-        gradient.addColorStop(0, '#6cf');
-        gradient.addColorStop(1, '#4af');
-        ctx.fillStyle = gradient;
+        // Thumb with cached gradient
+        if (!this.thumbGradientCache) {
+            this.thumbGradientCache = ctx.createRadialGradient(0, 0, 0, 0, 0, thumbRadius);
+            this.thumbGradientCache.addColorStop(0, '#6cf');
+            this.thumbGradientCache.addColorStop(1, '#4af');
+        }
+
+        ctx.save();
+        ctx.translate(thumbX, thumbY);
+        ctx.fillStyle = this.thumbGradientCache;
         ctx.beginPath();
-        ctx.arc(thumbX, thumbY, thumbRadius, 0, Math.PI * 2);
+        ctx.arc(0, 0, thumbRadius, 0, Math.PI * 2);
         ctx.fill();
 
         // Thumb border
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
+        ctx.restore();
 
-        // Store bounds for interaction
-        slider.bounds = { x, y: trackY - thumbRadius, width: sliderWidth, height: thumbRadius * 2 + sliderHeight };
+        // Bounds are now calculated in updateSliderBounds()
     }
 
     handleClick(x, y) {
@@ -222,7 +415,6 @@ class SettingsScene extends BaseScene {
         const back = this.buttons.back;
         if (x >= back.x && x <= back.x + back.width &&
             y >= back.y && y <= back.y + back.height) {
-            console.log('[SettingsScene] BACK clicked');
             if (this.onBack) {
                 this.onBack();
             }
@@ -233,21 +425,23 @@ class SettingsScene extends BaseScene {
         const reset = this.buttons.reset;
         if (x >= reset.x && x <= reset.x + reset.width &&
             y >= reset.y && y <= reset.y + reset.height) {
-            console.log('[SettingsScene] RESET clicked');
             this.resetToDefaults();
             return;
         }
+    }
 
+    handleMouseDown(x, y) {
         // Check sliders - start dragging
-        Object.keys(this.sliders).forEach(key => {
+        for (const key of Object.keys(this.sliders)) {
             const slider = this.sliders[key];
             if (slider.bounds &&
                 x >= slider.bounds.x && x <= slider.bounds.x + slider.bounds.width &&
                 y >= slider.bounds.y && y <= slider.bounds.y + slider.bounds.height) {
                 this.draggingSlider = key;
                 this.updateSliderValue(key, x);
+                return; // Early exit after finding match
             }
-        });
+        }
     }
 
     handleMouseMove(x, y) {
@@ -268,11 +462,10 @@ class SettingsScene extends BaseScene {
         const slider = this.sliders[key];
         if (!slider.bounds) return;
 
-        // Calculate new value
+        // Calculate new value (ratio is already clamped 0-1)
         const ratio = Math.max(0, Math.min(1, (mouseX - slider.bounds.x) / slider.bounds.width));
         const rawValue = slider.min + ratio * (slider.max - slider.min);
-        const steppedValue = Math.round(rawValue / slider.step) * slider.step;
-        slider.value = Math.max(slider.min, Math.min(slider.max, steppedValue));
+        slider.value = Math.round(rawValue / slider.step) * slider.step;
 
         // Apply to CONFIG
         this.applySliderToConfig(key, slider.value);
@@ -283,7 +476,7 @@ class SettingsScene extends BaseScene {
 
         if (keyPath.length === 2) {
             CONFIG[keyPath[0]][keyPath[1]] = value;
-            console.log(`[Settings] ${this.sliders[key].label} = ${value}`);
+            // Console logging removed for performance (called every frame during drag)
         }
     }
 
@@ -292,11 +485,11 @@ class SettingsScene extends BaseScene {
             this.sliders[key].value = this.defaults[key];
             this.applySliderToConfig(key, this.defaults[key]);
         });
-        console.log('[Settings] Reset to defaults');
     }
 
     handleResize() {
         this.updateButtonPositions();
+        this.updateSliderBounds();
     }
 
     // Set callback for back button
