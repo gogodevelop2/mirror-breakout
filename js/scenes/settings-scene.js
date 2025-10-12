@@ -49,9 +49,8 @@ class SettingsScene extends BaseScene {
         // Cached gradients
         this.thumbGradientCache = null;
 
-        // Layout mode
+        // Layout mode (determined by ResponsiveLayout)
         this.layoutMode = 'double'; // 'double' or 'single'
-        this.BREAKPOINT_WIDTH = 500; // px
     }
 
     onEnter(data) {
@@ -69,6 +68,10 @@ class SettingsScene extends BaseScene {
         this.sliders.brickRestitution.value = CONFIG.BRICK.RESTITUTION;
         this.sliders.brickDamping.value = CONFIG.BRICK.LINEAR_DAMPING;
 
+        this.updateLayout();
+    }
+
+    updateLayout() {
         this.updateButtonPositions();
         this.updateSliderBounds();
     }
@@ -92,36 +95,36 @@ class SettingsScene extends BaseScene {
     }
 
     updateButtonPositions() {
-        const width = this.canvas ? this.canvas.width : CONFIG.CANVAS_WIDTH;
-        const height = this.canvas ? this.canvas.height : CONFIG.CANVAS_HEIGHT;
+        const layout = ResponsiveLayout.getLayoutInfo();
 
-        // Adjust button size for small screens
-        const buttonScale = width < this.BREAKPOINT_WIDTH ? 0.85 : 1.0;
-        const buttonSpacing = width < this.BREAKPOINT_WIDTH ? 15 : 20;
+        // Responsive button sizes
+        const backBtnSize = ResponsiveLayout.buttonSize(180, 50);
+        const resetBtnSize = ResponsiveLayout.buttonSize(200, 50);
+        const buttonSpacing = ResponsiveLayout.spacing(20);
 
-        this.buttons.back.width = Math.floor(180 * buttonScale);
-        this.buttons.reset.width = Math.floor(200 * buttonScale);
-        this.buttons.back.height = Math.floor(50 * buttonScale);
-        this.buttons.reset.height = Math.floor(50 * buttonScale);
+        this.buttons.back.width = backBtnSize.width;
+        this.buttons.back.height = backBtnSize.height;
+        this.buttons.reset.width = resetBtnSize.width;
+        this.buttons.reset.height = resetBtnSize.height;
 
         // Position buttons at bottom center
-        const totalWidth = this.buttons.back.width + buttonSpacing + this.buttons.reset.width;
-        const startX = (width - totalWidth) / 2;
-        const buttonY = height - (width < this.BREAKPOINT_WIDTH ? 60 : 80);
+        const totalWidth = backBtnSize.width + buttonSpacing + resetBtnSize.width;
+        const startX = (layout.width - totalWidth) / 2;
+        const buttonY = layout.height - ResponsiveLayout.margin('bottom');
 
         this.buttons.back.x = startX;
         this.buttons.back.y = buttonY;
-
-        this.buttons.reset.x = startX + this.buttons.back.width + buttonSpacing;
+        this.buttons.reset.x = startX + backBtnSize.width + buttonSpacing;
         this.buttons.reset.y = buttonY;
     }
 
     updateSliderBounds() {
-        const width = this.canvas ? this.canvas.width : CONFIG.CANVAS_WIDTH;
-        const height = this.canvas ? this.canvas.height : CONFIG.CANVAS_HEIGHT;
+        const width = CONFIG.CANVAS_WIDTH;
+        const height = CONFIG.CANVAS_HEIGHT;
 
-        // Determine layout mode based on width
-        this.layoutMode = width < this.BREAKPOINT_WIDTH ? 'single' : 'double';
+        // Determine layout mode based on ResponsiveLayout size
+        const size = ResponsiveLayout.getSize();
+        this.layoutMode = (size === 'SMALL' || size === 'MEDIUM') ? 'single' : 'double';
 
         if (this.layoutMode === 'single') {
             this.updateSliderBoundsSingleColumn(width, height);
@@ -223,8 +226,6 @@ class SettingsScene extends BaseScene {
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
 
-        // Background is now rendered to bgCanvas in renderBackground()
-
         if (this.layoutMode === 'single') {
             this.renderSingleColumn(ctx, width, height);
         } else {
@@ -239,19 +240,17 @@ class SettingsScene extends BaseScene {
     renderDoubleColumn(ctx, width, height) {
         const centerX = width / 2;
 
-        // Title
+        // Title - responsive
         ctx.fillStyle = '#4af';
-        ctx.font = 'bold 48px Arial';
+        ctx.font = `bold ${ResponsiveLayout.fontSize(48)}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('PHYSICS SETTINGS', centerX, 60);
+        ctx.fillText('PHYSICS SETTINGS', centerX, ResponsiveLayout.spacing(60));
 
-        // Subtitle
+        // Subtitle - responsive
         ctx.fillStyle = '#aaa';
-        ctx.font = '16px Arial';
-        ctx.fillText('Adjust game physics in real-time', centerX, 100);
-
-        // Render sliders in two columns
+        ctx.font = `${ResponsiveLayout.fontSize(16)}px Arial`;
+        ctx.fillText('Adjust game physics in real-time', centerX, ResponsiveLayout.spacing(100));
         const sliderKeys = Object.keys(this.sliders);
         const leftColumn = sliderKeys.slice(0, 2);  // Ball Mass, Speed
         const rightColumn = sliderKeys.slice(2);    // Brick Mass, Bounce, Damping
@@ -298,17 +297,17 @@ class SettingsScene extends BaseScene {
     renderSingleColumn(ctx, width, height) {
         const centerX = width / 2;
 
-        // Smaller title
+        // Smaller title - responsive
         ctx.fillStyle = '#4af';
-        ctx.font = 'bold 32px Arial';
+        ctx.font = `bold ${ResponsiveLayout.fontSize(32)}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('PHYSICS SETTINGS', centerX, 40);
+        ctx.fillText('PHYSICS SETTINGS', centerX, ResponsiveLayout.spacing(40));
 
-        // Smaller subtitle
+        // Smaller subtitle - responsive
         ctx.fillStyle = '#aaa';
-        ctx.font = '13px Arial';
-        ctx.fillText('Adjust physics in real-time', centerX, 65);
+        ctx.font = `${ResponsiveLayout.fontSize(13)}px Arial`;
+        ctx.fillText('Adjust physics in real-time', centerX, ResponsiveLayout.spacing(65));
 
         const sliderKeys = Object.keys(this.sliders);
         const columnWidth = Math.min(width * 0.85, 280);
@@ -406,8 +405,6 @@ class SettingsScene extends BaseScene {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
-
-        // Bounds are now calculated in updateSliderBounds()
     }
 
     handleClick(x, y) {
@@ -488,8 +485,7 @@ class SettingsScene extends BaseScene {
     }
 
     handleResize() {
-        this.updateButtonPositions();
-        this.updateSliderBounds();
+        this.updateLayout();
     }
 
     // Set callback for back button

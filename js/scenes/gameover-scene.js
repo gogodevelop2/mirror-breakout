@@ -63,12 +63,45 @@ class GameOverScene extends BaseScene {
         console.log('[GameOverScene] Results:', this.results);
 
         this.time = 0;
-        this.updateButtonPositions();
+        this.updateLayout();
     }
 
-    updateButtonPositions() {
-        // Use auto-layout for horizontal-center pattern
-        this.autoLayoutButtons('horizontal-center');
+    updateLayout() {
+        if (!this.canvas) return;
+
+        const layout = ResponsiveLayout.getLayoutInfo();
+
+        // Responsive button sizes
+        const btnSize = ResponsiveLayout.buttonSize(180, 60);
+        this.buttons.retry.width = btnSize.width;
+        this.buttons.retry.height = btnSize.height;
+        this.buttons.menu.width = btnSize.width;
+        this.buttons.menu.height = btnSize.height;
+
+        // Button positions (horizontal center)
+        const gap = ResponsiveLayout.spacing(20);
+        const totalWidth = btnSize.width * 2 + gap;
+        const buttonY = layout.centerY + ResponsiveLayout.spacing(180);
+
+        this.buttons.retry.x = layout.centerX - totalWidth / 2;
+        this.buttons.retry.y = buttonY;
+        this.buttons.menu.x = this.buttons.retry.x + btnSize.width + gap;
+        this.buttons.menu.y = buttonY;
+
+        // Store responsive layout values for rendering
+        this.layout = {
+            centerX: layout.centerX,
+            centerY: layout.centerY,
+            titleY: layout.centerY - ResponsiveLayout.spacing(150),
+            titleSize: ResponsiveLayout.fontSize(72),
+            scoreboardY: layout.centerY - ResponsiveLayout.spacing(50),
+            scoreboardWidth: ResponsiveLayout.widgetSize(400),
+            scoreboardHeight: ResponsiveLayout.spacing(40),
+            timeY: layout.centerY + ResponsiveLayout.spacing(100),
+            timeSize: ResponsiveLayout.fontSize(24),
+            footerY: layout.height - ResponsiveLayout.margin('bottom') / 2,
+            footerSize: ResponsiveLayout.fontSize(14)
+        };
     }
 
     update(deltaTime) {
@@ -79,74 +112,73 @@ class GameOverScene extends BaseScene {
     }
 
     render(ctx) {
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
-        const centerX = width / 2;
-        const centerY = height / 2;
-
-        // Background is now rendered to bgCanvas in onEnter()
+        if (!this.layout) return;
 
         // Victory/Defeat title
         ctx.save();
-        ctx.translate(centerX, centerY - 150);
+        ctx.translate(this.layout.centerX, this.layout.titleY);
         ctx.scale(this.titleScale, this.titleScale);
 
         if (this.results.playerWon) {
             // Victory
             ctx.fillStyle = '#4af';
-            ctx.font = 'bold 72px Arial';
+            ctx.font = `bold ${this.layout.titleSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('VICTORY!', 0, 0);
 
             // Glow effect
             ctx.shadowColor = '#4af';
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = ResponsiveLayout.spacing(20);
             ctx.fillText('VICTORY!', 0, 0);
         } else {
             // Defeat
             ctx.fillStyle = '#f44';
-            ctx.font = 'bold 72px Arial';
+            ctx.font = `bold ${this.layout.titleSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('DEFEAT', 0, 0);
 
             // Glow effect
             ctx.shadowColor = '#f44';
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = ResponsiveLayout.spacing(20);
             ctx.fillText('DEFEAT', 0, 0);
         }
 
         ctx.restore();
 
-        // Scoreboard
-        this.renderScoreboard(ctx, centerX, centerY - 50);
+        // Scoreboard (responsive)
+        this.renderScoreboard(
+            ctx,
+            this.layout.centerX,
+            this.layout.scoreboardY,
+            this.layout.scoreboardWidth,
+            this.layout.scoreboardHeight
+        );
 
-        // Game time
+        // Game time (responsive)
         const minutes = Math.floor(this.results.gameTime / 60);
         const seconds = Math.floor(this.results.gameTime % 60);
         const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
         ctx.fillStyle = '#aaa';
-        ctx.font = '24px Arial';
+        ctx.font = `${this.layout.timeSize}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(`Time: ${timeStr}`, centerX, centerY + 100);
+        ctx.fillText(`Time: ${timeStr}`, this.layout.centerX, this.layout.timeY);
 
         // Buttons
         this.renderButton(ctx, this.buttons.retry);
         this.renderButton(ctx, this.buttons.menu);
 
-        // Footer
+        // Footer (responsive)
         ctx.fillStyle = '#666';
-        ctx.font = '14px Arial';
+        ctx.font = `${this.layout.footerSize}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('© 2025 Mirror Breakout', centerX, height - 30);
+        ctx.fillText('© 2025 Mirror Breakout', this.layout.centerX, this.layout.footerY);
     }
 
-    renderScoreboard(ctx, centerX, centerY) {
-        const barWidth = 400;
-        const barHeight = 40;
-        const barX = centerX - barWidth / 2;
+    renderScoreboard(ctx, centerX, centerY, width, height) {
+        const barX = centerX - width / 2;
 
         // Total bricks
         const totalBricks = this.results.playerScore + this.results.aiScore;
@@ -154,30 +186,33 @@ class GameOverScene extends BaseScene {
 
         // Background bar
         ctx.fillStyle = '#222';
-        ctx.fillRect(barX, centerY, barWidth, barHeight);
+        ctx.fillRect(barX, centerY, width, height);
 
         // Player bar (from left)
         ctx.fillStyle = '#4af';
-        ctx.fillRect(barX, centerY, barWidth * playerRatio, barHeight);
+        ctx.fillRect(barX, centerY, width * playerRatio, height);
 
         // AI bar (from right)
         ctx.fillStyle = '#f44';
-        ctx.fillRect(barX + barWidth * playerRatio, centerY, barWidth * (1 - playerRatio), barHeight);
+        ctx.fillRect(barX + width * playerRatio, centerY, width * (1 - playerRatio), height);
 
-        // Border
+        // Border (responsive)
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(barX, centerY, barWidth, barHeight);
+        ctx.lineWidth = ResponsiveLayout.borderWidth(2);
+        ctx.strokeRect(barX, centerY, width, height);
 
-        // Labels
+        // Labels (responsive font)
+        const labelSize = ResponsiveLayout.fontSize(18);
+        const padding = ResponsiveLayout.spacing(10);
+
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 18px Arial';
+        ctx.font = `bold ${labelSize}px Arial`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(`PLAYER: ${this.results.playerScore}`, barX + 10, centerY + barHeight / 2);
+        ctx.fillText(`PLAYER: ${this.results.playerScore}`, barX + padding, centerY + height / 2);
 
         ctx.textAlign = 'right';
-        ctx.fillText(`AI: ${this.results.aiScore}`, barX + barWidth - 10, centerY + barHeight / 2);
+        ctx.fillText(`AI: ${this.results.aiScore}`, barX + width - padding, centerY + height / 2);
     }
 
     handleMouseMove(x, y) {
@@ -210,7 +245,14 @@ class GameOverScene extends BaseScene {
     }
 
     handleResize() {
-        this.updateButtonPositions();
+        this.updateLayout();
+
+        // Re-render background overlay after resize
+        if (this.bgCanvas) {
+            const bgCtx = this.bgCanvas.getContext('2d');
+            bgCtx.fillStyle = 'rgba(10, 10, 20, 0.95)';
+            bgCtx.fillRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
+        }
     }
 
     // Set callbacks

@@ -40,8 +40,8 @@ class MenuScene extends BaseScene {
 
     initBackgroundBalls() {
         // Create 5 slow-moving balls for background animation
-        const width = CONFIG.CANVAS_WIDTH || 600;
-        const height = CONFIG.CANVAS_HEIGHT || 700;
+        const width = CONFIG.CANVAS_WIDTH;
+        const height = CONFIG.CANVAS_HEIGHT;
 
         for (let i = 0; i < 5; i++) {
             this.bgBalls.push({
@@ -58,7 +58,7 @@ class MenuScene extends BaseScene {
     onEnter(data) {
         super.onEnter(data);
         this.time = 0;
-        this.updateButtonPositions();
+        this.updateLayout();
 
         // Render static background to bgCanvas if available
         if (this.bgCanvas) {
@@ -66,9 +66,44 @@ class MenuScene extends BaseScene {
         }
     }
 
-    updateButtonPositions() {
-        // Use auto-layout for vertical-center pattern
-        this.autoLayoutButtons('vertical-center');
+    updateLayout() {
+        if (!this.canvas) return;
+
+        const layout = ResponsiveLayout.getLayoutInfo();
+
+        // Responsive button sizes
+        const btnSize = ResponsiveLayout.buttonSize(200, 60);
+        this.buttons.start.width = btnSize.width;
+        this.buttons.start.height = btnSize.height;
+        this.buttons.settings.width = btnSize.width;
+        this.buttons.settings.height = btnSize.height;
+
+        // Title and subtitle positions
+        const titleY = ResponsiveLayout.verticalPosition(0.25);
+        const subtitleY = titleY + ResponsiveLayout.spacing(80);
+
+        // Button positions (below subtitle, centered vertically in remaining space)
+        const buttonGap = ResponsiveLayout.spacing(80);
+        const remainingSpace = layout.height - subtitleY - ResponsiveLayout.margin('bottom');
+        const buttonAreaStartY = subtitleY + remainingSpace * 0.3; // Start 30% into remaining space
+
+        this.buttons.start.x = layout.centerX - btnSize.width / 2;
+        this.buttons.start.y = buttonAreaStartY;
+        this.buttons.settings.x = layout.centerX - btnSize.width / 2;
+        this.buttons.settings.y = buttonAreaStartY + buttonGap;
+
+        // Store responsive layout values for rendering
+        this.layout = {
+            centerX: layout.centerX,
+            centerY: layout.centerY,
+            titleY: titleY,
+            titleSize: ResponsiveLayout.fontSize(48),
+            subtitleY: subtitleY,
+            subtitleSize: ResponsiveLayout.fontSize(16),
+            footerY: layout.height - ResponsiveLayout.margin('bottom') / 2,
+            footerSize: ResponsiveLayout.fontSize(14),
+            gradientBlur: ResponsiveLayout.spacing(20)
+        };
     }
 
     update(deltaTime) {
@@ -79,8 +114,8 @@ class MenuScene extends BaseScene {
         this.gradientOffset = cycle <= 1 ? cycle : 2 - cycle;  // 0→1→0 (ping-pong)
 
         // Update background balls
-        const width = CONFIG.CANVAS_WIDTH || 600;
-        const height = CONFIG.CANVAS_HEIGHT || 700;
+        const width = CONFIG.CANVAS_WIDTH;
+        const height = CONFIG.CANVAS_HEIGHT;
 
         this.bgBalls.forEach(ball => {
             ball.x += ball.vx * deltaTime;
@@ -130,60 +165,55 @@ class MenuScene extends BaseScene {
     }
 
     render(ctx) {
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
+        if (!this.layout) return;
 
-        // Note: Background is now rendered to bgCanvas in renderBackground()
-        // This canvas (gameCanvas) only renders foreground elements
-
-        // Title with gradient animation (matches CSS header)
+        // Title with gradient animation
         ctx.save();
 
-        const titleY = height * 0.25;  // 화면 상단 25% 위치
-
-        // Create animated gradient (centered oscillation)
-        const gradientWidth = 800;
-        // Oscillate from -300 to +300 (centered around text)
-        const offset = (this.gradientOffset - 0.5) * 600;
+        // Create animated gradient (centered oscillation) - responsive
+        const gradientWidth = ResponsiveLayout.spacing(800);
+        const offset = (this.gradientOffset - 0.5) * ResponsiveLayout.spacing(600);
 
         const titleGradient = ctx.createLinearGradient(
-            width / 2 - gradientWidth / 2 + offset,
-            titleY,
-            width / 2 + gradientWidth / 2 + offset,
-            titleY
+            this.layout.centerX - gradientWidth / 2 + offset,
+            this.layout.titleY,
+            this.layout.centerX + gradientWidth / 2 + offset,
+            this.layout.titleY
         );
         titleGradient.addColorStop(0, '#4af');
         titleGradient.addColorStop(0.5, '#f4a');
         titleGradient.addColorStop(1, '#4af');
 
-        // Main title (Orbitron font) - two lines
+        // Main title (Orbitron font) - two lines - responsive
         ctx.fillStyle = titleGradient;
-        ctx.font = '900 48px Orbitron, Arial';
+        ctx.font = `900 ${this.layout.titleSize}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('MIRROR', width / 2, titleY - 30);
-        ctx.fillText('BREAKOUT', width / 2, titleY + 30);
+
+        const lineSpacing = ResponsiveLayout.spacing(30);
+        ctx.fillText('MIRROR', this.layout.centerX, this.layout.titleY - lineSpacing);
+        ctx.fillText('BREAKOUT', this.layout.centerX, this.layout.titleY + lineSpacing);
 
         ctx.restore();
 
-        // Subtitle
+        // Subtitle - responsive
         ctx.globalAlpha = 0.6;
         ctx.fillStyle = '#aaa';
-        ctx.font = '16px Arial';
+        ctx.font = `${this.layout.subtitleSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Physics-Based Competitive Breakout', width / 2, titleY + 80);
+        ctx.fillText('Physics-Based Competitive Breakout', this.layout.centerX, this.layout.subtitleY);
         ctx.globalAlpha = 1.0;
 
         // Buttons
         this.renderButton(ctx, this.buttons.start);
         this.renderButton(ctx, this.buttons.settings);
 
-        // Footer
+        // Footer - responsive
         ctx.fillStyle = '#666';
-        ctx.font = '14px Arial';
+        ctx.font = `${this.layout.footerSize}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('© 2025 Mirror Breakout', width / 2, height - 30);
+        ctx.fillText('© 2025 Mirror Breakout', this.layout.centerX, this.layout.footerY);
     }
 
     handleMouseMove(x, y) {
@@ -216,11 +246,11 @@ class MenuScene extends BaseScene {
     }
 
     handleResize() {
-        this.updateButtonPositions();
+        this.updateLayout();
 
         // Reset background balls to fit new canvas size
-        const width = CONFIG.CANVAS_WIDTH || 600;
-        const height = CONFIG.CANVAS_HEIGHT || 700;
+        const width = CONFIG.CANVAS_WIDTH;
+        const height = CONFIG.CANVAS_HEIGHT;
 
         this.bgBalls.forEach(ball => {
             ball.x = Math.min(ball.x, width - ball.radius);

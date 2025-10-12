@@ -97,6 +97,7 @@ class MirrorBreakout {
             // Re-initialize UI controls for new game
             if (this.gameScene.physics) {
                 if (this.uiControls) {
+                    this.uiControls.destroy();
                     this.uiControls = new UIControls(CONFIG, this.gameScene.physics);
                 }
             }

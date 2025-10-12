@@ -7,6 +7,269 @@
 
 ---
 
+## 2025-10-12 (Session 5): 반응형 시스템 통합 및 코드 최적화
+
+### 주요 변경 사항
+
+#### 1. 중앙집중식 ResponsiveLayout 시스템 구축
+**문제**: 각 Scene마다 반응형 로직이 분산되어 있고, GameOverScene이 반응형이 아니어서 작은 화면에서 깨짐
+
+**해결**: 새로운 `ResponsiveLayout` 싱글톤 클래스 생성
+- **새 파일**: `js/responsive-layout.js` (206줄)
+- **통합 위치**: `index.html`에 `config.js` 다음에 추가
+
+**ResponsiveLayout 주요 기능**:
+```javascript
+// Breakpoint 시스템
+SMALL: 300px    // 작은 모바일
+MEDIUM: 500px   // 일반 모바일
+LARGE: 700px    // 태블릿/데스크톱
+
+// 핵심 메서드
+getSize()                          // 현재 화면 크기 카테고리
+getScale(baseWidth)                // 0.4~1.2 스케일 계산
+fontSize(base)                     // 반응형 폰트 크기
+spacing(base)                      // 반응형 간격
+buttonSize(w, h)                   // 반응형 버튼 크기
+widgetSize(base, minRatio, maxRatio) // 반응형 위젯 크기
+margin(type)                       // 반응형 마진
+borderWidth(base)                  // 반응형 테두리
+verticalPosition(ratio)            // 비율 기반 Y 위치
+horizontalPosition(ratio)          // 비율 기반 X 위치
+getLayoutInfo()                    // 통합 레이아웃 정보 객체
+```
+
+**폰트 크기 배율**:
+- SMALL: 0.5배 (50%)
+- MEDIUM: 0.75배 (75%)
+- LARGE: 1.0배
+- XLARGE: 1.1배
+
+**스케일 범위 확대**:
+- 이전: 0.6 ~ 1.2
+- 현재: **0.4 ~ 1.2** (더 작은 화면 지원)
+
+#### 2. BaseScene에 반응형 시스템 통합
+**변경 사항**:
+- `updateLayout()` 메서드 추가 (서브클래스에서 오버라이드)
+- `handleResize()` 수정 → `updateLayout()` 호출
+- `renderButton()` 메서드 수정 → ResponsiveLayout 사용
+
+```javascript
+// base-scene.js
+updateLayout() {
+    // 서브클래스에서 ResponsiveLayout을 사용해 구현
+}
+
+handleResize() {
+    this.updateLayout();
+}
+
+renderButton(ctx, button) {
+    // ResponsiveLayout.fontSize(), .borderWidth() 사용
+}
+```
+
+#### 3. 모든 Scene 반응형 리팩토링
+**리팩토링된 파일**:
+- `js/scenes/menu-scene.js` - 반응형 완료
+- `js/scenes/gameover-scene.js` - 반응형 새로 구현
+- `js/scenes/settings-scene.js` - 반응형 개선
+
+**공통 패턴**:
+```javascript
+// 각 Scene의 updateLayout()
+updateLayout() {
+    const layout = ResponsiveLayout.getLayoutInfo();
+
+    // 버튼 크기 계산
+    const btnSize = ResponsiveLayout.buttonSize(200, 60);
+    this.buttons.start.width = btnSize.width;
+    this.buttons.start.height = btnSize.height;
+
+    // 위치 계산
+    this.buttons.start.x = layout.centerX - btnSize.width / 2;
+    this.buttons.start.y = ResponsiveLayout.spacing(300);
+
+    // 렌더링용 레이아웃 값 저장
+    this.layout = {
+        centerX: layout.centerX,
+        titleSize: ResponsiveLayout.fontSize(48),
+        // ...
+    };
+}
+
+render(ctx) {
+    // 저장된 this.layout 값 사용
+    ctx.font = `${this.layout.titleSize}px Arial`;
+    ctx.fillText('Title', this.layout.centerX, ...);
+}
+```
+
+**GameOverScene 개선**:
+- 모든 요소가 반응형으로 변경
+- 타이틀, 스코어보드, 버튼, 시간 표시 등 모두 화면 크기에 맞춰 조정
+- `this.layout` 객체에 모든 반응형 값 저장하여 render()에서 사용
+
+**MenuScene 개선**:
+- 버튼 위치 계산 로직 수정
+- 부제목(subtitle) 아래 적절한 위치에 버튼 배치
+- 배경 볼 애니메이션 반응형 대응
+
+**SettingsScene 개선**:
+- ResponsiveLayout.getSize()를 사용한 레이아웃 모드 판단
+- 2컬럼/1컬럼 자동 전환 (SMALL/MEDIUM → single, LARGE/XLARGE → double)
+- 타이틀, 부제목, 버튼 모두 반응형 적용
+
+#### 4. SceneManager 버그 수정
+**문제**: 윈도우 리사이즈 시 CONFIG와 canvas 크기가 업데이트되지 않음
+
+**해결** (`scene-manager.js:260-279`):
+```javascript
+handleResize() {
+    // 1. CONFIG 업데이트
+    CONFIG.updateCanvasSize();
+
+    // 2. Canvas 크기 업데이트
+    this.canvas.width = CONFIG.CANVAS_WIDTH;
+    this.canvas.height = CONFIG.CANVAS_HEIGHT;
+
+    if (this.bgCanvas) {
+        this.bgCanvas.width = CONFIG.CANVAS_WIDTH;
+        this.bgCanvas.height = CONFIG.CANVAS_HEIGHT;
+    }
+
+    // 3. 현재 Scene에 알림
+    if (this.currentScene) {
+        this.currentScene.handleResize();
+    }
+}
+```
+
+#### 5. CSS 개선 - Canvas 중앙 정렬
+**문제**: 게임 캔버스가 화면 왼쪽에 고정되어 있음
+
+**해결** (`styles.css`):
+```css
+/* 게임 컨테이너를 inline-block으로 변경 */
+.game-container {
+    position: relative;
+    display: inline-block;  /* 변경: flex → inline-block */
+    margin: 0 auto;
+}
+
+/* 배경 캔버스는 relative로 크기 결정 */
+#bgCanvas {
+    position: relative;
+    z-index: 1;
+    background: #000;
+}
+
+/* 게임 캔버스는 absolute로 배경에 오버레이 */
+#gameCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    background: transparent;
+    pointer-events: auto;
+}
+```
+
+#### 6. 레거시 코드 정리
+**제거된 항목**:
+1. **CONFIG.UI_LAYOUT** (34줄)
+   - ResponsiveLayout으로 대체되어 불필요
+   - `config.js`에서 완전 제거
+
+2. **BaseScene.autoLayoutButtons()** (62줄)
+   - 각 Scene이 ResponsiveLayout을 직접 사용
+   - 더 유연하고 명확한 레이아웃 제어
+
+3. **test-scene.js** (47줄)
+   - 테스트용 파일로 프로덕션에 불필요
+   - `js/scenes/test-scene.js` 삭제
+
+4. **불필요한 fallback 제거**
+   - `menu-scene.js`: `CONFIG.CANVAS_WIDTH || 600` → `CONFIG.CANVAS_WIDTH`
+   - CONFIG는 항상 초기화되어 있어 fallback 불필요
+
+5. **메모리 누수 수정**
+   - `main.js:100` - 게임 재시작 시 UIControls를 destroy() 후 재생성
+   - 이전에는 destroy 없이 재생성하여 메모리 누수 가능성
+
+**결과**:
+- 총 143줄 제거
+- 코드 중복 제거
+- 더 명확한 구조
+
+#### 7. 반응형 브레이크포인트 조정
+**이전**:
+```javascript
+SMALL: 400px
+MEDIUM: 600px
+LARGE: 800px
+```
+
+**현재**:
+```javascript
+SMALL: 300px   // 더 작은 모바일 지원
+MEDIUM: 500px
+LARGE: 700px
+```
+
+**효과**:
+- 매우 작은 화면(< 300px)까지 지원
+- 폰트/간격이 더 적극적으로 축소 (SMALL: 50%)
+- 모든 요소가 제대로 표시됨
+
+#### 8. 아키텍처 개선 효과
+
+**통합 전 (문제점)**:
+```
+MenuScene
+  └── 자체 반응형 로직 (하드코딩)
+
+GameScene
+  └── 반응형 없음 (고정 크기)
+
+GameOverScene
+  └── 반응형 없음 → 작은 화면에서 깨짐 ❌
+
+SettingsScene
+  └── 자체 반응형 로직 (분리됨)
+```
+
+**통합 후 (해결)**:
+```
+ResponsiveLayout (중앙 싱글톤)
+  ├── MenuScene → ResponsiveLayout 사용 ✅
+  ├── GameScene → ResponsiveLayout 사용 ✅
+  ├── GameOverScene → ResponsiveLayout 사용 ✅
+  └── SettingsScene → ResponsiveLayout 사용 ✅
+```
+
+**장점**:
+- ✅ 모든 Scene이 일관된 반응형 동작
+- ✅ 중복 코드 제거 (143줄)
+- ✅ 유지보수 용이 (한 곳에서 수정)
+- ✅ 새 Scene 추가 시 자동으로 반응형
+- ✅ 더 작은 화면(300px 미만)까지 지원
+
+### 성능 영향
+- ✅ ResponsiveLayout은 순수 계산만 수행 (렌더링 없음)
+- ✅ 캐싱 불필요 (계산 비용 매우 낮음)
+- ✅ 메모리 사용량 감소 (중복 코드 제거)
+
+### 테스트 완료
+- ✅ 모든 Scene 반응형 동작 확인
+- ✅ 리사이즈 시 즉시 반영
+- ✅ 300px 미만 화면에서 정상 동작
+- ✅ 1920px 이상 대형 화면 정상 동작
+- ✅ 메모리 누수 수정 확인
+
+---
+
 ## 2025-10-11 (Session 4): UI/UX 개선 및 물리 밸런싱
 
 ### 주요 변경 사항

@@ -258,8 +258,24 @@ class SceneManager {
      * Handle window resize
      */
     handleResize() {
-        if (!this.currentScene) return;
-        this.currentScene.handleResize();
+        // Update CONFIG canvas size
+        CONFIG.updateCanvasSize();
+
+        // Update canvas elements
+        this.canvas.width = CONFIG.CANVAS_WIDTH;
+        this.canvas.height = CONFIG.CANVAS_HEIGHT;
+
+        if (this.bgCanvas) {
+            this.bgCanvas.width = CONFIG.CANVAS_WIDTH;
+            this.bgCanvas.height = CONFIG.CANVAS_HEIGHT;
+        }
+
+        // Notify current scene
+        if (this.currentScene) {
+            this.currentScene.handleResize();
+        }
+
+        console.log('[SceneManager] Resized:', CONFIG.CANVAS_WIDTH, 'x', CONFIG.CANVAS_HEIGHT);
     }
 
     /**

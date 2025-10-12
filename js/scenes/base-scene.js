@@ -122,75 +122,20 @@ class BaseScene {
     }
 
     /**
-     * Handle window resize
+     * Update layout based on responsive system
+     * Override this in subclass to calculate responsive positions/sizes
      */
-    handleResize() {
+    updateLayout() {
         // Override in subclass
+        // Use ResponsiveLayout methods to calculate positions
     }
 
     /**
-     * Auto-layout buttons with common patterns
-     * @param {string} layout - Layout type: 'vertical-center', 'horizontal-center', 'horizontal-bottom'
-     * @param {Object} options - Layout options { startY, spacing, gap }
+     * Handle window resize
      */
-    autoLayoutButtons(layout = 'vertical-center', options = {}) {
-        if (!this.canvas || !this.buttons) return;
-
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const height = this.canvas.height;
-
-        const buttons = Object.values(this.buttons);
-        const defaultSpacing = CONFIG.UI_LAYOUT.BUTTON.VERTICAL_SPACING;
-        const defaultGap = CONFIG.UI_LAYOUT.BUTTON.HORIZONTAL_GAP;
-
-        switch (layout) {
-            case 'vertical-center':
-                // Vertical stack, centered horizontally and vertically
-                const startY = options.startY || (centerY + CONFIG.UI_LAYOUT.MENU.BUTTON_START_Y_OFFSET);
-                const spacing = options.spacing || defaultSpacing;
-
-                buttons.forEach((btn, i) => {
-                    btn.x = centerX - btn.width / 2;
-                    btn.y = startY + (i * spacing);
-                });
-                break;
-
-            case 'horizontal-center':
-                // Horizontal row, centered both ways
-                const totalWidth = buttons.reduce((sum, btn) => sum + btn.width, 0) +
-                                  (buttons.length - 1) * (options.gap || defaultGap);
-                const startX = centerX - totalWidth / 2;
-                const posY = options.startY || (centerY + CONFIG.UI_LAYOUT.GAMEOVER.BUTTON_Y_OFFSET);
-
-                let currentX = startX;
-                buttons.forEach((btn) => {
-                    btn.x = currentX;
-                    btn.y = posY;
-                    currentX += btn.width + (options.gap || defaultGap);
-                });
-                break;
-
-            case 'horizontal-bottom':
-                // Horizontal row at bottom of screen
-                const gap = options.gap || defaultGap;
-                const bottomY = options.bottomY || (height - CONFIG.UI_LAYOUT.SETTINGS.BUTTON_BOTTOM_MARGIN);
-
-                // Calculate total width
-                const total = buttons.reduce((sum, btn) => sum + btn.width, 0) +
-                             (buttons.length - 1) * gap;
-                let x = centerX - total / 2;
-
-                buttons.forEach((btn) => {
-                    btn.x = x;
-                    btn.y = bottomY;
-                    x += btn.width + gap;
-                });
-                break;
-
-            default:
-                console.warn(`[BaseScene] Unknown layout: ${layout}`);
-        }
+    handleResize() {
+        // Call updateLayout by default
+        this.updateLayout();
     }
 
     /**
@@ -199,9 +144,19 @@ class BaseScene {
      * @param {Object} button - Button object with x, y, width, height, text, hovered
      */
     renderButton(ctx, button) {
+        // Responsive values
+        const shadowOffset = Math.max(2, ResponsiveLayout.spacing(4));
+        const borderWidth = ResponsiveLayout.borderWidth(3);
+        const fontSize = ResponsiveLayout.fontSize(20);
+
         // Button shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(button.x + 4, button.y + 4, button.width, button.height);
+        ctx.fillRect(
+            button.x + shadowOffset,
+            button.y + shadowOffset,
+            button.width,
+            button.height
+        );
 
         // Button background
         if (button.hovered) {
@@ -220,12 +175,14 @@ class BaseScene {
 
         // Button border
         ctx.strokeStyle = button.hovered ? '#fff' : '#6cf';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = borderWidth;
         ctx.strokeRect(button.x, button.y, button.width, button.height);
 
         // Button text
         ctx.fillStyle = '#fff';
-        ctx.font = button.hovered ? 'bold 22px Arial' : 'bold 20px Arial';
+        ctx.font = button.hovered
+            ? `bold ${fontSize + 2}px Arial`
+            : `bold ${fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(

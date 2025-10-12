@@ -27,31 +27,28 @@ body {
 /* Game Container */
 .game-container {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 600px;
-    height: auto;  /* Auto height to match canvas size */
+    display: inline-block;
     margin: 0 auto;
 }
 
-/* Canvas layers - positioned absolutely to overlap */
+/* Canvas layers - stacked on top of each other */
 #bgCanvas, #gameCanvas {
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: block;
     border: 2px solid #444;
     border-radius: 22px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 #bgCanvas {
+    position: relative;
     z-index: 1;
     background: #000;
 }
 
 #gameCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
     z-index: 2;
     background: transparent;
     pointer-events: auto;  /* gameCanvas receives all mouse events */
