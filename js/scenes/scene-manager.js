@@ -109,6 +109,7 @@ class SceneManager {
 
         this.isRunning = true;
         this.lastTime = performance.now();
+        this.accumulator = 0;  // Initialize fixed timestep accumulator
         this.gameLoop();
         console.log('[SceneManager] Started');
     }
@@ -128,21 +129,39 @@ class SceneManager {
     }
 
     /**
-     * Main game loop
+     * Main game loop (Fixed Timestep)
+     *
+     * Uses accumulator pattern to ensure consistent game speed
+     * regardless of monitor refresh rate (60Hz, 144Hz, 240Hz, etc.)
      */
     gameLoop() {
         if (!this.isRunning) return;
 
         const currentTime = performance.now();
-        const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+        const deltaTime = (currentTime - this.lastTime) / 1000; // Actual elapsed time in seconds
         this.lastTime = currentTime;
 
-        // Update current scene
-        if (this.currentScene && this.currentScene.isActive) {
-            this.currentScene.update(deltaTime);
+        // Accumulate elapsed time
+        this.accumulator += deltaTime;
+
+        // Cap accumulator to prevent spiral of death
+        // (e.g., if browser tab was inactive for a long time)
+        const maxAccumulator = CONFIG.TIMESTEP * 10; // Max 10 frames worth
+        if (this.accumulator > maxAccumulator) {
+            this.accumulator = maxAccumulator;
         }
 
-        // Render current scene
+        // Update with fixed timestep
+        // May run multiple times (low FPS) or skip frames (high FPS)
+        while (this.accumulator >= CONFIG.TIMESTEP) {
+            if (this.currentScene && this.currentScene.isActive) {
+                // Always use fixed timestep for deterministic simulation
+                this.currentScene.update(CONFIG.TIMESTEP);
+            }
+            this.accumulator -= CONFIG.TIMESTEP;
+        }
+
+        // Render current scene (can run at variable framerate)
         if (this.currentScene && this.currentScene.isActive) {
             // Clear main canvas (transparent to show bgCanvas below)
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);

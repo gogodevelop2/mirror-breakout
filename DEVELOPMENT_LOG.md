@@ -7,6 +7,200 @@
 
 ---
 
+## 2025-10-14 (Session 6): Fixed Timestep 구현 (주사율 독립성 확보)
+
+### 주요 변경 사항
+
+#### 1. 문제 발견: 모니터 주사율 의존성
+**증상**: 게임 속도가 모니터 주사율에 따라 달라지는 현상
+- 60Hz 모니터: 정상 속도 (1배속)
+- 144Hz 모니터: 2.4배 빠른 속도
+- 240Hz 모니터: 4배 빠른 속도
+
+**원인 분석**:
+```javascript
+// 이전 코드 (scene-manager.js:133-142)
+const deltaTime = (currentTime - this.lastTime) / 1000; // 가변 시간
+this.currentScene.update(deltaTime);  // 주사율에 비례하여 호출
+
+// physics.js:410-414
+const subSteps = 2;
+const subTimeStep = CONFIG.TIMESTEP / subSteps;  // 고정 1/60초
+for (let i = 0; i < subSteps; i++) {
+    this.world.step(subTimeStep);  // 고정 timestep이지만...
+}
+```
+
+**핵심 문제**:
+- 물리 엔진은 고정 timestep(1/60초)을 사용하지만
+- `step()` **호출 횟수**가 주사율에 비례함
+- 60Hz: 60회/초 × (1/60초) = 1초 진행 ✅
+- 144Hz: 144회/초 × (1/60초) = 2.4초 진행 ❌
+
+#### 2. 해결책: Fixed Timestep with Accumulator
+
+**개념**:
+실제 경과 시간을 "빚"으로 누적하고, 고정 시간 단위만큼 쌓이면 업데이트
+
+**구현** (`scene-manager.js:107-175`):
+
+```javascript
+/**
+ * Start the game loop
+ */
+start() {
+    if (this.isRunning) return;
+
+    this.isRunning = true;
+    this.lastTime = performance.now();
+    this.accumulator = 0;  // ⭐ Fixed timestep 누적기 초기화
+    this.gameLoop();
+    console.log('[SceneManager] Started');
+}
+
+/**
+ * Main game loop (Fixed Timestep)
+ *
+ * Uses accumulator pattern to ensure consistent game speed
+ * regardless of monitor refresh rate (60Hz, 144Hz, 240Hz, etc.)
+ */
+gameLoop() {
+    if (!this.isRunning) return;
+
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - this.lastTime) / 1000; // 실제 경과 시간
+    this.lastTime = currentTime;
+
+    // 시간 누적
+    this.accumulator += deltaTime;
+
+    // 탭 비활성화 대비 (최대 10프레임분만 누적)
+    const maxAccumulator = CONFIG.TIMESTEP * 10;
+    if (this.accumulator > maxAccumulator) {
+        this.accumulator = maxAccumulator;
+    }
+
+    // 고정 timestep으로 업데이트 (여러 번 가능)
+    while (this.accumulator >= CONFIG.TIMESTEP) {
+        if (this.currentScene && this.currentScene.isActive) {
+            this.currentScene.update(CONFIG.TIMESTEP);  // ⭐ 항상 1/60초 고정!
+        }
+        this.accumulator -= CONFIG.TIMESTEP;
+    }
+
+    // 렌더링 (가변 프레임레이트 OK)
+    if (this.currentScene && this.currentScene.isActive) {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.currentScene.render(this.ctx);
+    }
+
+    this.animationId = requestAnimationFrame(() => this.gameLoop());
+}
+```
+
+#### 3. 동작 원리
+
+**60Hz 모니터**:
+```
+프레임 1: deltaTime = 0.0167초
+  → accumulator = 0.0167
+  → update(0.0167) 1회 실행
+  → accumulator = 0
+
+프레임 2: deltaTime = 0.0167초
+  → accumulator = 0.0167
+  → update(0.0167) 1회 실행
+
+결과: 초당 60번 업데이트 ✅
+```
+
+**144Hz 모니터**:
+```
+프레임 1: deltaTime = 0.0069초
+  → accumulator = 0.0069 (부족, 업데이트 안 함)
+
+프레임 2: deltaTime = 0.0069초
+  → accumulator = 0.0138 (여전히 부족)
+
+프레임 3: deltaTime = 0.0069초
+  → accumulator = 0.0207 (충분!)
+  → update(0.0167) 1회 실행
+  → accumulator = 0.0040 (남은 시간 다음에 사용)
+
+결과: 초당 60번 업데이트 ✅
+```
+
+**30Hz 모니터 (저사양)**:
+```
+프레임 1: deltaTime = 0.0333초
+  → accumulator = 0.0333
+  → update(0.0167) 1회 실행
+  → accumulator = 0.0166
+  → update(0.0167) 1회 실행 (2번째)
+  → accumulator = 0
+
+결과: 초당 60번 업데이트 ✅ (프레임당 2번 업데이트)
+```
+
+#### 4. 최종 결과
+
+| 모니터 주사율 | 렌더링 프레임 | 물리 업데이트 | 게임 속도 |
+|--------------|--------------|--------------|----------|
+| 30Hz         | 30 FPS       | 60회/초       | 1배속 ✅ |
+| 60Hz         | 60 FPS       | 60회/초       | 1배속 ✅ |
+| 144Hz        | 144 FPS      | 60회/초       | 1배속 ✅ |
+| 240Hz        | 240 FPS      | 60회/초       | 1배속 ✅ |
+
+**효과**:
+- ✅ 모든 모니터에서 **동일한 게임 속도**
+- ✅ 고주사율 모니터: 더 부드러운 렌더링 (물리는 동일)
+- ✅ 저주사율 모니터: 프레임당 여러 번 업데이트하여 따라잡기
+- ✅ 결정론적 시뮬레이션 (재현 가능)
+- ✅ 탭 비활성화 후 복귀 시 안전 (최대 10프레임 누적 제한)
+
+#### 5. 기술적 이점
+
+**1. 완벽한 독립성**
+- 모니터 주사율 무관
+- CPU 성능 무관
+- 브라우저 종류 무관
+
+**2. 물리 엔진 안정성**
+- Box2D는 고정 timestep을 가정하고 설계됨
+- 가변 timestep은 충돌 감지 오류 유발 가능
+
+**3. 업계 표준 방식**
+- Unity: `FixedUpdate()` (0.02초 고정)
+- Unreal: `TickGroup` 시스템
+- Godot: `_physics_process(delta)`
+
+**4. 디버깅 용이**
+- 항상 같은 입력 → 같은 결과
+- 재현 가능한 버그
+- 멀티플레이어 동기화 가능 (향후)
+
+#### 6. 변경된 파일
+
+- `js/scenes/scene-manager.js` (2곳 수정)
+  - `start()`: accumulator 초기화 추가
+  - `gameLoop()`: Fixed Timestep 로직으로 전면 재작성
+
+#### 7. 테스트 완료
+
+- ✅ 60Hz 모니터: 정상 동작 확인
+- ✅ 브라우저 개발자 도구로 주사율 시뮬레이션 테스트
+- ✅ 탭 비활성화 후 복귀 정상 동작
+- ✅ 물리 시뮬레이션 안정성 유지
+
+### 참고 자료
+
+**Fixed Timestep Accumulator 패턴**:
+- Glenn Fiedler's "Fix Your Timestep!" (게임 개발 표준 문서)
+- Unity Documentation: `Time.fixedDeltaTime`
+- Box2D Manual: "Time Step Recommendations"
+
+---
+
 ## 2025-10-12 (Session 5): 반응형 시스템 통합 및 코드 최적화
 
 ### 주요 변경 사항
