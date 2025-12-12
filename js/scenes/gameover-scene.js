@@ -199,7 +199,7 @@ class GameOverScene extends BaseScene {
         }
     }
 
-    render(ctx) {
+    render(ctx, alpha = 1.0) {
         if (!this.layout) return;
 
         switch (this.phase) {

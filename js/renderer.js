@@ -106,28 +106,39 @@ class Renderer {
         this.ctx.restore();
     }
 
+    /**
+     * Linear interpolation between two values
+     * @param {number} a - Start value
+     * @param {number} b - End value
+     * @param {number} t - Interpolation factor (0-1)
+     * @returns {number} Interpolated value
+     */
+    lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
     // Main render function
-    render(physics, game) {
+    render(physics, game, alpha = 1.0) {
         // Setup rounded corners clipping
         this.setupRoundedClip();
-        
+
         // Draw background
         this.drawBackground();
-        
-        // Draw game entities
-        this.drawBricks(physics);
-        this.drawPaddles(physics, game);
-        this.drawBalls(physics);
-        
+
+        // Draw game entities with interpolation
+        this.drawBricks(physics, alpha);
+        this.drawPaddles(physics, game, alpha);
+        this.drawBalls(physics, alpha);
+
         // Draw effects
         this.drawEffects(game);
-        
+
         // Draw UI
         this.drawUI(game);
-        
+
         // Draw overlays (countdown, game over)
         this.drawOverlays(game);
-        
+
         // Restore context
         this.ctx.restore();
     }
@@ -159,21 +170,24 @@ class Renderer {
     }
     
     // Draw all bricks
-    drawBricks(physics) {
+    drawBricks(physics, alpha) {
         const shadow = CONFIG.RENDERING.SHADOW.BRICK;
         const lighting = CONFIG.RENDERING.LIGHTING;
 
         // Render function to avoid array spreading and duplication
         const renderBrick = (brick) => {
-            const pos = brick.body.getPosition();
-            const angle = brick.body.getAngle();
-            const x = Utils.toPixels(pos.x);
-            const y = Utils.toPixels(pos.y);
+            // Interpolate position and angle
+            const x = this.lerp(brick.prevPosition.x, brick.currentPosition.x, alpha);
+            const y = this.lerp(brick.prevPosition.y, brick.currentPosition.y, alpha);
+            const angle = this.lerp(brick.prevAngle, brick.currentAngle, alpha);
+
+            const displayX = Utils.toPixels(x);
+            const displayY = Utils.toPixels(y);
             const w = Utils.toPixels(CONFIG.BRICK.WIDTH);
             const h = Utils.toPixels(CONFIG.BRICK.HEIGHT);
 
             // Use helper methods for cleaner code
-            this.withTransform(x, y, angle, () => {
+            this.withTransform(displayX, displayY, angle, () => {
                 // Apply destruction alpha if brick is being destroyed
                 const alpha = brick.destroying ? brick.destroyAlpha : 1;
 
@@ -215,25 +229,34 @@ class Renderer {
     }
     
     // Draw paddles
-    drawPaddles(physics, game) {
+    drawPaddles(physics, game, alpha) {
         // Player paddle (top)
         const playerPaddle = physics.getEntity(game.paddleIds.player);
         if (playerPaddle) {
-            this.drawHexagonPaddle(playerPaddle.body, CONFIG.COLORS.PLAYER);
+            // Interpolate position and angle
+            const x = this.lerp(playerPaddle.prevPosition.x, playerPaddle.currentPosition.x, alpha);
+            const y = this.lerp(playerPaddle.prevPosition.y, playerPaddle.currentPosition.y, alpha);
+            const angle = this.lerp(playerPaddle.prevAngle, playerPaddle.currentAngle, alpha);
+
+            this.drawHexagonPaddle(x, y, angle, CONFIG.COLORS.PLAYER);
         }
-        
+
         // AI paddle (bottom) with difficulty color
         const aiPaddle = physics.getEntity(game.paddleIds.ai);
         if (aiPaddle) {
-            this.drawHexagonPaddle(aiPaddle.body, game.aiColor);
+            // Interpolate position and angle
+            const x = this.lerp(aiPaddle.prevPosition.x, aiPaddle.currentPosition.x, alpha);
+            const y = this.lerp(aiPaddle.prevPosition.y, aiPaddle.currentPosition.y, alpha);
+            const angle = this.lerp(aiPaddle.prevAngle, aiPaddle.currentAngle, alpha);
+
+            this.drawHexagonPaddle(x, y, angle, game.aiColor);
         }
     }
-    
+
     // Draw hexagon paddle
-    drawHexagonPaddle(body, color) {
-        const pos = body.getPosition();
-        const x = Utils.toPixels(pos.x);
-        const y = Utils.toPixels(pos.y);
+    drawHexagonPaddle(x, y, angle, color) {
+        const displayX = Utils.toPixels(x);
+        const displayY = Utils.toPixels(y);
         const shadow = CONFIG.RENDERING.SHADOW.PADDLE;
         const lighting = CONFIG.RENDERING.LIGHTING;
 
@@ -243,7 +266,7 @@ class Renderer {
             CONFIG.PADDLE.HEIGHT
         );
 
-        this.withTransform(x, y, null, () => {
+        this.withTransform(displayX, displayY, angle, () => {
             // Draw hexagon path
             this.ctx.beginPath();
             vertices.forEach((v, i) => {
@@ -284,13 +307,16 @@ class Renderer {
     }
     
     // Draw balls
-    drawBalls(physics) {
+    drawBalls(physics, alpha) {
         const balls = physics.getEntitiesOfType('ball');
 
         balls.forEach(ball => {
-            const pos = ball.body.getPosition();
-            const x = Utils.toPixels(pos.x);
-            const y = Utils.toPixels(pos.y);
+            // Interpolate position
+            const x = this.lerp(ball.prevPosition.x, ball.currentPosition.x, alpha);
+            const y = this.lerp(ball.prevPosition.y, ball.currentPosition.y, alpha);
+
+            const displayX = Utils.toPixels(x);
+            const displayY = Utils.toPixels(y);
             const r = Utils.toPixels(CONFIG.BALL.RADIUS);
 
             // Draw ball - simple solid circle
@@ -298,7 +324,7 @@ class Renderer {
 
             // Draw ball
             this.ctx.beginPath();
-            this.ctx.arc(x, y, r, 0, Math.PI * 2);
+            this.ctx.arc(displayX, displayY, r, 0, Math.PI * 2);
             this.ctx.fillStyle = CONFIG.COLORS.BALL;
             this.ctx.fill();
 

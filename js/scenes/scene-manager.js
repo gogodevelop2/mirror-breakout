@@ -164,8 +164,11 @@ class SceneManager {
             // Clear main canvas (transparent to show bgCanvas below)
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-            // Render scene (foreground elements only)
-            this.currentScene.render(this.ctx);
+            // Calculate interpolation alpha (0.0 ~ 0.99)
+            const alpha = this.accumulator / CONFIG.TIMESTEP;
+
+            // Render scene with interpolation (foreground elements only)
+            this.currentScene.render(this.ctx, alpha);
         }
 
         // Continue loop

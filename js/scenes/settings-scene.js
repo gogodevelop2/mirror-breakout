@@ -222,7 +222,7 @@ class SettingsScene extends BaseScene {
         // No animation needed
     }
 
-    render(ctx) {
+    render(ctx, alpha = 1.0) {
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
 

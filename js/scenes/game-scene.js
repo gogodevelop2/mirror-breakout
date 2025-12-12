@@ -101,11 +101,11 @@ class GameScene extends BaseScene {
         }
     }
 
-    render(ctx) {
+    render(ctx, alpha = 1.0) {
         if (!this.renderer || !this.physics || !this.game) return;
 
-        // Use the game's renderer
-        this.renderer.render(this.physics, this.game);
+        // Use the game's renderer with interpolation
+        this.renderer.render(this.physics, this.game, alpha);
     }
 
     handleKeyDown(event) {

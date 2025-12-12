@@ -154,7 +154,15 @@ class PhysicsEngine {
         });
 
         const id = this.nextId++;
-        this.entities.set(id, { body, type: 'ball', id });
+        const entity = {
+            id: id,
+            type: 'ball',
+            body: body,
+            // Interpolation: Store previous and current positions
+            prevPosition: { x: x, y: y },
+            currentPosition: { x: x, y: y }
+        };
+        this.entities.set(id, entity);
         body.setUserData({ id, type: 'ball' });
 
         return id;
@@ -179,14 +187,20 @@ class PhysicsEngine {
         
         const id = this.nextId++;
         const paddleType = isPlayer ? 'playerPaddle' : 'aiPaddle';
-        this.entities.set(id, {
-            body,
+        const entity = {
+            id: id,
             type: paddleType,
-            id,
-            prevX: x  // Track previous position for momentum transfer
-        });
+            body: body,
+            prevX: x,  // Track previous position for momentum transfer
+            // Interpolation: Store previous and current positions/angles
+            prevPosition: { x: x, y: y },
+            currentPosition: { x: x, y: y },
+            prevAngle: 0,
+            currentAngle: 0
+        };
+        this.entities.set(id, entity);
         body.setUserData({ id, type: paddleType });
-        
+
         return id;
     }
     
@@ -222,7 +236,20 @@ class PhysicsEngine {
 
         const id = this.nextId++;
         const brickType = isPlayerTarget ? 'playerTargetBrick' : 'aiTargetBrick';
-        this.entities.set(id, { body, type: brickType, id, color, row, col });
+        const entity = {
+            id: id,
+            type: brickType,
+            body: body,
+            color: color,
+            row: row,
+            col: col,
+            // Interpolation: Store previous and current positions/angles
+            prevPosition: { x: x, y: y },
+            currentPosition: { x: x, y: y },
+            prevAngle: 0,
+            currentAngle: 0
+        };
+        this.entities.set(id, entity);
         body.setUserData({ id, type: brickType });
 
         return id;
@@ -436,6 +463,30 @@ class PhysicsEngine {
 
         // Invalidate entity cache at the start of each physics step
         this.invalidateCache();
+
+        // Interpolation: Save all entities' current positions to previous positions
+        for (const entity of this.entities.values()) {
+            if (entity.body && entity.currentPosition) {
+                const pos = entity.body.getPosition();
+                const angle = entity.body.getAngle();
+
+                // Copy current → previous
+                entity.prevPosition.x = entity.currentPosition.x;
+                entity.prevPosition.y = entity.currentPosition.y;
+
+                if (entity.currentAngle !== undefined) {
+                    entity.prevAngle = entity.currentAngle;
+                }
+
+                // Update current from physics body
+                entity.currentPosition.x = pos.x;
+                entity.currentPosition.y = pos.y;
+
+                if (entity.currentAngle !== undefined) {
+                    entity.currentAngle = angle;
+                }
+            }
+        }
 
         // Sub-stepping: Break down each frame into smaller steps for more accurate collision detection
         // This prevents tunneling and overlap issues with many dynamic rotating bodies

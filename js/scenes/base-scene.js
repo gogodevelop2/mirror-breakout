@@ -55,8 +55,9 @@ class BaseScene {
     /**
      * Render scene to canvas
      * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} alpha - Interpolation alpha (0-1) for smooth rendering
      */
-    render(ctx) {
+    render(ctx, alpha = 1.0) {
         // Override in subclass
     }
 

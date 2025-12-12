@@ -164,7 +164,7 @@ class MenuScene extends BaseScene {
         });
     }
 
-    render(ctx) {
+    render(ctx, alpha = 1.0) {
         if (!this.layout) return;
 
         // Title with gradient animation
