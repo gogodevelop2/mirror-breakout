@@ -296,9 +296,9 @@ class GameManager {
         }
         
         // Clamp to max speed
-        this.paddleVelocity.player = Math.max(
-            -CONFIG.PADDLE.PLAYER_SPEED,
-            Math.min(CONFIG.PADDLE.PLAYER_SPEED, this.paddleVelocity.player)
+        this.paddleVelocity.player = Utils.clampSymmetric(
+            this.paddleVelocity.player,
+            CONFIG.PADDLE.PLAYER_SPEED
         );
         
         // Apply velocity to paddle
@@ -384,7 +384,7 @@ class GameManager {
         
         // Clamp to max speed
         const maxSpeed = CONFIG.PADDLE.AI_BASE_SPEED * this.ai.difficulty;
-        this.paddleVelocity.ai = Math.max(-maxSpeed, Math.min(maxSpeed, this.paddleVelocity.ai));
+        this.paddleVelocity.ai = Utils.clampSymmetric(this.paddleVelocity.ai, maxSpeed);
         
         // Apply velocity
         this.physics.movePaddle(this.paddleIds.ai, this.paddleVelocity.ai);

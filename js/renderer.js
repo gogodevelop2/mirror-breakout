@@ -132,10 +132,11 @@ class Renderer {
             }
 
             // Draw brick with shadow (centered at 0,0 after rotation)
-            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            this.ctx.shadowBlur = 2;
-            this.ctx.shadowOffsetX = 1;
-            this.ctx.shadowOffsetY = 1;
+            const brickShadow = CONFIG.RENDERING.SHADOW.BRICK;
+            this.ctx.shadowColor = brickShadow.color;
+            this.ctx.shadowBlur = brickShadow.blur;
+            this.ctx.shadowOffsetX = brickShadow.offsetX;
+            this.ctx.shadowOffsetY = brickShadow.offsetY;
 
             // Draw brick
             this.ctx.fillStyle = brick.color;
@@ -204,10 +205,11 @@ class Renderer {
         );
         
         // Add shadow
-        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        this.ctx.shadowBlur = 4;
-        this.ctx.shadowOffsetX = 2;
-        this.ctx.shadowOffsetY = 2;
+        const paddleShadow = CONFIG.RENDERING.SHADOW.PADDLE;
+        this.ctx.shadowColor = paddleShadow.color;
+        this.ctx.shadowBlur = paddleShadow.blur;
+        this.ctx.shadowOffsetX = paddleShadow.offsetX;
+        this.ctx.shadowOffsetY = paddleShadow.offsetY;
         
         // Draw hexagon shape
         this.ctx.beginPath();
@@ -283,10 +285,11 @@ class Renderer {
             const radius = Utils.toPixels(effect.radius);
             
             // Draw multiple rings
-            [1, 0.7, 1.3].forEach((scale, i) => {
+            const effectConfig = CONFIG.RENDERING.EFFECTS;
+            effectConfig.SPLIT_RING_SCALES.forEach((scale, i) => {
                 this.ctx.strokeStyle = effect.color;
-                this.ctx.lineWidth = 3 - i;
-                this.ctx.globalAlpha = effect.opacity * (1 - i * 0.3);
+                this.ctx.lineWidth = effectConfig.SPLIT_RING_BASE_WIDTH - i;
+                this.ctx.globalAlpha = effect.opacity * (1 - i * effectConfig.SPLIT_RING_OPACITY_DECAY);
                 
                 this.ctx.beginPath();
                 this.ctx.arc(x, y, radius * scale, 0, Math.PI * 2);
@@ -303,7 +306,7 @@ class Renderer {
             const radius = Utils.toPixels(effect.radius);
             
             this.ctx.strokeStyle = effect.color;
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = CONFIG.RENDERING.EFFECTS.SPAWN_RING_WIDTH;
             this.ctx.globalAlpha = effect.opacity;
             
             this.ctx.beginPath();

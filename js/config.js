@@ -162,6 +162,44 @@ const CONFIG = {
         PLAYER_ZONE_END: 2.8,    // 플레이어 영역 끝 (중앙선에서 0.7m 위)
         AI_ZONE_START: 4.2,      // AI 영역 시작 (중앙선에서 0.7m 아래)
         NEUTRAL_ZONE_SIZE: 0.7   // 중립 지대 크기 (각 방향으로)
+    },
+
+    // 렌더링 설정
+    RENDERING: {
+        // 그림자 효과
+        SHADOW: {
+            BRICK: {
+                color: 'rgba(0, 0, 0, 0.3)',
+                blur: 2,
+                offsetX: 1,
+                offsetY: 1
+            },
+            PADDLE: {
+                color: 'rgba(0, 0, 0, 0.4)',
+                blur: 4,
+                offsetX: 2,
+                offsetY: 2
+            }
+        },
+
+        // 이펙트 설정
+        EFFECTS: {
+            SPLIT_RING_SCALES: [1, 0.7, 1.3],  // 분열 이펙트 링 크기
+            SPLIT_RING_OPACITY_DECAY: 0.3,     // 링별 투명도 감소
+            SPLIT_RING_BASE_WIDTH: 3,          // 기본 선 굵기
+            SPAWN_RING_WIDTH: 2                // 스폰 이펙트 링 굵기
+        },
+
+        // 조명 효과
+        LIGHTING: {
+            BRICK_HIGHLIGHT: 'rgba(255, 255, 255, 0.2)',
+            BRICK_SHADOW: 'rgba(0, 0, 0, 0.2)',
+            PADDLE_SHINE: [
+                { stop: 0, color: 'rgba(255, 255, 255, 0.3)' },
+                { stop: 0.5, color: 'rgba(255, 255, 255, 0.1)' },
+                { stop: 1, color: 'rgba(0, 0, 0, 0.2)' }
+            ]
+        }
     }
 };
 
@@ -171,10 +209,74 @@ const Utils = {
     toMeters(pixels) {
         return pixels / CONFIG.SCALE;
     },
-    
+
     // Convert meters to pixels
     toPixels(meters) {
         return meters * CONFIG.SCALE;
+    },
+
+    /**
+     * 값을 min과 max 사이로 제한
+     * @param {number} value - 제한할 값
+     * @param {number} min - 최소값
+     * @param {number} max - 최대값
+     * @returns {number}
+     */
+    clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    },
+
+    /**
+     * 대칭 범위로 클램핑 (-limit ~ +limit)
+     * @param {number} value - 제한할 값
+     * @param {number} limit - 절대값 제한
+     * @returns {number}
+     */
+    clampSymmetric(value, limit) {
+        return Math.max(-limit, Math.min(limit, value));
+    },
+
+    /**
+     * 원형 물체의 밀도 계산
+     * @param {number} mass - 질량
+     * @param {number} radius - 반지름
+     * @returns {number}
+     */
+    calculateCircleDensity(mass, radius) {
+        const area = Math.PI * radius * radius;
+        return mass / area;
+    },
+
+    /**
+     * 사각형 물체의 밀도 계산
+     * @param {number} mass - 질량
+     * @param {number} width - 너비
+     * @param {number} height - 높이
+     * @returns {number}
+     */
+    calculateRectDensity(mass, width, height) {
+        const area = width * height;
+        return mass / area;
+    },
+
+    /**
+     * 공 밀도 (CONFIG 기반)
+     * @returns {number}
+     */
+    getBallDensity() {
+        return this.calculateCircleDensity(CONFIG.BALL.MASS, CONFIG.BALL.RADIUS);
+    },
+
+    /**
+     * 브릭 밀도 (CONFIG 기반)
+     * @returns {number}
+     */
+    getBrickDensity() {
+        return this.calculateRectDensity(
+            CONFIG.BRICK.MASS,
+            CONFIG.BRICK.WIDTH,
+            CONFIG.BRICK.HEIGHT
+        );
     },
     
     // Get brick color

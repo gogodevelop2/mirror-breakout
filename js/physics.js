@@ -138,8 +138,7 @@ class PhysicsEngine {
         });
 
         // Calculate density to achieve desired mass from config
-        const ballArea = Math.PI * CONFIG.BALL.RADIUS * CONFIG.BALL.RADIUS;
-        const ballDensity = CONFIG.BALL.MASS / ballArea;
+        const ballDensity = Utils.getBallDensity();
 
         const fixture = body.createFixture({
             shape: planck.Circle(CONFIG.BALL.RADIUS),
@@ -200,8 +199,7 @@ class PhysicsEngine {
         const color = Utils.getBrickColor(row, isPlayerTarget);
 
         // Calculate density to achieve desired mass from config
-        const brickArea = CONFIG.BRICK.WIDTH * CONFIG.BRICK.HEIGHT;
-        const brickDensity = CONFIG.BRICK.MASS / brickArea;
+        const brickDensity = Utils.getBrickDensity();
 
         body.createFixture({
             shape: planck.Box(CONFIG.BRICK.WIDTH/2, CONFIG.BRICK.HEIGHT/2),
@@ -267,7 +265,7 @@ class PhysicsEngine {
             
             if (nextX - halfWidth < 0 || nextX + halfWidth > CONFIG.WORLD_WIDTH) {
                 // Stop at boundary
-                const clampedX = Math.max(halfWidth, Math.min(CONFIG.WORLD_WIDTH - halfWidth, nextX));
+                const clampedX = Utils.clamp(nextX, halfWidth, CONFIG.WORLD_WIDTH - halfWidth);
                 entity.body.setPosition(planck.Vec2(clampedX, currentPos.y));
                 entity.body.setLinearVelocity(planck.Vec2(0, 0));
             }
