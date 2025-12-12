@@ -83,23 +83,23 @@
 
 ---
 
-## Phase 4: 렌더링 시스템 최적화
+## Phase 4: 렌더링 시스템 최적화 ✅
 
 ### 헬퍼 메서드 추가
-- [ ] `withShadow(shadowConfig, callback)` 메서드
-- [ ] `withAlpha(alpha, callback)` 메서드
-- [ ] `withTransform(x, y, angle, callback)` 메서드
+- [x] `withShadow(shadowConfig, callback)` 메서드
+- [x] `withAlpha(alpha, callback)` 메서드
+- [x] `withTransform(x, y, angle, callback)` 메서드
 
 ### 리팩토링
-- [ ] `drawBricks()` 헬퍼 메서드 적용
-- [ ] `_drawBrickLighting()` 분리
-- [ ] `drawPaddles()` 헬퍼 메서드 적용
-- [ ] `drawEffects()` 헬퍼 메서드 적용
+- [x] `drawBricks()` 헬퍼 메서드 적용
+- [x] `_drawBrickLighting()` 분리
+- [x] `drawPaddles()` 헬퍼 메서드 적용
+- [x] `drawEffects()` 헬퍼 메서드 적용
 
 ### 상수 적용
-- [ ] 그림자 설정 → `CONFIG.RENDERING.SHADOW` 사용
-- [ ] 이펙트 설정 → `CONFIG.RENDERING.EFFECTS` 사용
-- [ ] 조명 설정 → `CONFIG.RENDERING.LIGHTING` 사용
+- [x] 그림자 설정 → `CONFIG.RENDERING.SHADOW` 사용
+- [x] 이펙트 설정 → `CONFIG.RENDERING.EFFECTS` 사용
+- [x] 조명 설정 → `CONFIG.RENDERING.LIGHTING` 사용
 
 ---
 
@@ -148,7 +148,7 @@
 | Phase 1 | 2025-12-12 | Utils 함수 및 렌더링 상수 정리 완료 |
 | Phase 2 | 2025-12-12 | InputManager 통합, 중복 이벤트 리스너 제거 |
 | Phase 3 | 2025-12-12 | AIController 분리, game.js 경량화 (110줄 축소) |
-| Phase 4 | - | |
+| Phase 4 | 2025-12-12 | 렌더링 헬퍼 메서드 추가, 코드 중복 제거 |
 | Phase 5 | - | |
 | Phase 6 | - | 선택적 |
 

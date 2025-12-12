@@ -53,7 +53,59 @@ class Renderer {
         this.updateCanvasSize();
         this.setupGradients();
     }
-    
+
+    // === Rendering Helper Methods ===
+
+    /**
+     * Apply shadow settings and execute callback
+     * @param {Object} shadowConfig - Shadow configuration {color, blur, offsetX, offsetY}
+     * @param {Function} callback - Render callback
+     */
+    withShadow(shadowConfig, callback) {
+        this.ctx.save();
+        this.ctx.shadowColor = shadowConfig.color;
+        this.ctx.shadowBlur = shadowConfig.blur;
+        this.ctx.shadowOffsetX = shadowConfig.offsetX;
+        this.ctx.shadowOffsetY = shadowConfig.offsetY;
+
+        callback(this.ctx);
+
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.restore();
+    }
+
+    /**
+     * Apply alpha transparency and execute callback
+     * @param {number} alpha - Alpha value (0-1)
+     * @param {Function} callback - Render callback
+     */
+    withAlpha(alpha, callback) {
+        this.ctx.save();
+        this.ctx.globalAlpha = alpha;
+
+        callback(this.ctx);
+
+        this.ctx.globalAlpha = 1;
+        this.ctx.restore();
+    }
+
+    /**
+     * Apply transform (translate + rotate) and execute callback
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {number} angle - Rotation angle (optional)
+     * @param {Function} callback - Render callback
+     */
+    withTransform(x, y, angle, callback) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        if (angle) this.ctx.rotate(angle);
+
+        callback(this.ctx);
+
+        this.ctx.restore();
+    }
+
     // Main render function
     render(physics, game) {
         // Setup rounded corners clipping
@@ -108,70 +160,58 @@ class Renderer {
     
     // Draw all bricks
     drawBricks(physics) {
-        // Get all bricks
-        const playerTargetBricks = physics.getEntitiesOfType('playerTargetBrick');
-        const aiTargetBricks = physics.getEntitiesOfType('aiTargetBrick');
+        const shadow = CONFIG.RENDERING.SHADOW.BRICK;
+        const lighting = CONFIG.RENDERING.LIGHTING;
 
         // Render function to avoid array spreading and duplication
         const renderBrick = (brick) => {
             const pos = brick.body.getPosition();
-            const angle = brick.body.getAngle();  // Get rotation angle
+            const angle = brick.body.getAngle();
             const x = Utils.toPixels(pos.x);
             const y = Utils.toPixels(pos.y);
             const w = Utils.toPixels(CONFIG.BRICK.WIDTH);
             const h = Utils.toPixels(CONFIG.BRICK.HEIGHT);
 
-            // Save context and apply rotation
-            this.ctx.save();
-            this.ctx.translate(x, y);
-            this.ctx.rotate(angle);  // Apply rotation!
+            // Use helper methods for cleaner code
+            this.withTransform(x, y, angle, () => {
+                // Apply destruction alpha if brick is being destroyed
+                const alpha = brick.destroying ? brick.destroyAlpha : 1;
 
-            // Apply destruction alpha if brick is being destroyed (iOS-style fade out)
-            if (brick.destroying) {
-                this.ctx.globalAlpha = brick.destroyAlpha;
-            }
+                this.withAlpha(alpha, () => {
+                    // Draw brick with shadow
+                    this.withShadow(shadow, () => {
+                        this.ctx.fillStyle = brick.color;
+                        this.ctx.fillRect(-w/2, -h/2, w, h);
+                    });
 
-            // Draw brick with shadow (centered at 0,0 after rotation)
-            const brickShadow = CONFIG.RENDERING.SHADOW.BRICK;
-            this.ctx.shadowColor = brickShadow.color;
-            this.ctx.shadowBlur = brickShadow.blur;
-            this.ctx.shadowOffsetX = brickShadow.offsetX;
-            this.ctx.shadowOffsetY = brickShadow.offsetY;
+                    // Add lighting effect
+                    this._drawBrickLighting(w, h, lighting);
 
-            // Draw brick
-            this.ctx.fillStyle = brick.color;
-            this.ctx.fillRect(-w/2, -h/2, w, h);
-
-            // Reset shadow
-            this.ctx.shadowColor = 'transparent';
-
-            // Add simple lighting effect
-            const gradient = this.ctx.createLinearGradient(
-                -w/2, -h/2,
-                -w/2, h/2
-            );
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
-            this.ctx.fillStyle = gradient;
-            this.ctx.fillRect(-w/2, -h/2, w, h);
-
-            // Add border
-            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            this.ctx.lineWidth = 0.5;
-            this.ctx.strokeRect(-w/2, -h/2, w, h);
-
-            // Reset global alpha
-            if (brick.destroying) {
-                this.ctx.globalAlpha = 1.0;
-            }
-
-            // Restore context
-            this.ctx.restore();
+                    // Add border
+                    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                    this.ctx.lineWidth = 0.5;
+                    this.ctx.strokeRect(-w/2, -h/2, w, h);
+                });
+            });
         };
 
         // Render each brick type separately (no array spreading)
-        playerTargetBricks.forEach(renderBrick);
-        aiTargetBricks.forEach(renderBrick);
+        physics.getEntitiesOfType('playerTargetBrick').forEach(renderBrick);
+        physics.getEntitiesOfType('aiTargetBrick').forEach(renderBrick);
+    }
+
+    /**
+     * Draw lighting gradient on brick
+     * @param {number} w - Brick width in pixels
+     * @param {number} h - Brick height in pixels
+     * @param {Object} lighting - Lighting configuration
+     */
+    _drawBrickLighting(w, h, lighting) {
+        const gradient = this.ctx.createLinearGradient(-w/2, -h/2, -w/2, h/2);
+        gradient.addColorStop(0, lighting.BRICK_HIGHLIGHT);
+        gradient.addColorStop(1, lighting.BRICK_SHADOW);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(-w/2, -h/2, w, h);
     }
     
     // Draw paddles
@@ -194,62 +234,53 @@ class Renderer {
         const pos = body.getPosition();
         const x = Utils.toPixels(pos.x);
         const y = Utils.toPixels(pos.y);
-        
-        this.ctx.save();
-        this.ctx.translate(x, y);
-        
+        const shadow = CONFIG.RENDERING.SHADOW.PADDLE;
+        const lighting = CONFIG.RENDERING.LIGHTING;
+
         // Get vertices in pixels
         const vertices = Utils.getHexagonVertices(
             CONFIG.PADDLE.WIDTH,
             CONFIG.PADDLE.HEIGHT
         );
-        
-        // Add shadow
-        const paddleShadow = CONFIG.RENDERING.SHADOW.PADDLE;
-        this.ctx.shadowColor = paddleShadow.color;
-        this.ctx.shadowBlur = paddleShadow.blur;
-        this.ctx.shadowOffsetX = paddleShadow.offsetX;
-        this.ctx.shadowOffsetY = paddleShadow.offsetY;
-        
-        // Draw hexagon shape
-        this.ctx.beginPath();
-        vertices.forEach((v, i) => {
-            const px = Utils.toPixels(v.x);
-            const py = Utils.toPixels(v.y);
-            
-            if (i === 0) {
-                this.ctx.moveTo(px, py);
-            } else {
-                this.ctx.lineTo(px, py);
-            }
+
+        this.withTransform(x, y, null, () => {
+            // Draw hexagon path
+            this.ctx.beginPath();
+            vertices.forEach((v, i) => {
+                const px = Utils.toPixels(v.x);
+                const py = Utils.toPixels(v.y);
+
+                if (i === 0) {
+                    this.ctx.moveTo(px, py);
+                } else {
+                    this.ctx.lineTo(px, py);
+                }
+            });
+            this.ctx.closePath();
+
+            // Fill with shadow
+            this.withShadow(shadow, () => {
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+            });
+
+            // Add metallic shine effect
+            const shineGradient = this.ctx.createLinearGradient(
+                0, -Utils.toPixels(CONFIG.PADDLE.HEIGHT/2),
+                0, Utils.toPixels(CONFIG.PADDLE.HEIGHT/2)
+            );
+            lighting.PADDLE_SHINE.forEach(stop => {
+                shineGradient.addColorStop(stop.stop, stop.color);
+            });
+
+            this.ctx.fillStyle = shineGradient;
+            this.ctx.fill();
+
+            // Add edge highlight
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            this.ctx.lineWidth = 1;
+            this.ctx.stroke();
         });
-        this.ctx.closePath();
-        
-        // Fill with base color
-        this.ctx.fillStyle = color;
-        this.ctx.fill();
-        
-        // Reset shadow for shine effect
-        this.ctx.shadowColor = 'transparent';
-        
-        // Add metallic shine effect
-        const shineGradient = this.ctx.createLinearGradient(
-            0, -Utils.toPixels(CONFIG.PADDLE.HEIGHT/2),
-            0, Utils.toPixels(CONFIG.PADDLE.HEIGHT/2)
-        );
-        shineGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-        shineGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
-        shineGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
-        
-        this.ctx.fillStyle = shineGradient;
-        this.ctx.fill();
-        
-        // Add edge highlight
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-        
-        this.ctx.restore();
     }
     
     // Draw balls
@@ -277,43 +308,42 @@ class Renderer {
     
     // Draw effects
     drawEffects(game) {
+        const effectConfig = CONFIG.RENDERING.EFFECTS;
+
         // Split effect
         if (game.effects.splitEffect) {
             const effect = game.effects.splitEffect;
             const x = Utils.toPixels(effect.x);
             const y = Utils.toPixels(effect.y);
             const radius = Utils.toPixels(effect.radius);
-            
-            // Draw multiple rings
-            const effectConfig = CONFIG.RENDERING.EFFECTS;
+
+            // Draw multiple rings with helper method
             effectConfig.SPLIT_RING_SCALES.forEach((scale, i) => {
-                this.ctx.strokeStyle = effect.color;
-                this.ctx.lineWidth = effectConfig.SPLIT_RING_BASE_WIDTH - i;
-                this.ctx.globalAlpha = effect.opacity * (1 - i * effectConfig.SPLIT_RING_OPACITY_DECAY);
-                
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, radius * scale, 0, Math.PI * 2);
-                this.ctx.stroke();
+                const alpha = effect.opacity * (1 - i * effectConfig.SPLIT_RING_OPACITY_DECAY);
+
+                this.withAlpha(alpha, () => {
+                    this.ctx.strokeStyle = effect.color;
+                    this.ctx.lineWidth = effectConfig.SPLIT_RING_BASE_WIDTH - i;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, radius * scale, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                });
             });
-            
-            this.ctx.globalAlpha = 1;
         }
-        
+
         // Spawn effects
         game.effects.spawnEffects.forEach(effect => {
             const x = Utils.toPixels(effect.x);
             const y = Utils.toPixels(effect.y);
             const radius = Utils.toPixels(effect.radius);
-            
-            this.ctx.strokeStyle = effect.color;
-            this.ctx.lineWidth = CONFIG.RENDERING.EFFECTS.SPAWN_RING_WIDTH;
-            this.ctx.globalAlpha = effect.opacity;
-            
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, radius, 0, Math.PI * 2);
-            this.ctx.stroke();
-            
-            this.ctx.globalAlpha = 1;
+
+            this.withAlpha(effect.opacity, () => {
+                this.ctx.strokeStyle = effect.color;
+                this.ctx.lineWidth = effectConfig.SPAWN_RING_WIDTH;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+                this.ctx.stroke();
+            });
         });
     }
     
