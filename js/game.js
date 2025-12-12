@@ -267,9 +267,9 @@ class GameManager {
         let targetVelocity = 0;
         
         // Get input direction
-        if (this.keys['ArrowLeft']) {
+        if (Input.isKeyDown('ArrowLeft')) {
             targetVelocity = -CONFIG.PADDLE.PLAYER_SPEED;
-        } else if (this.keys['ArrowRight']) {
+        } else if (Input.isKeyDown('ArrowRight')) {
             targetVelocity = CONFIG.PADDLE.PLAYER_SPEED;
         }
         

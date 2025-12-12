@@ -10,9 +10,6 @@ class GameScene extends BaseScene {
         this.game = null;
         this.renderer = null;
 
-        // Input state
-        this.keys = {};
-
         // Callbacks
         this.onGameOver = null;
 
@@ -44,9 +41,6 @@ class GameScene extends BaseScene {
         // Create renderer (using injected canvas)
         this.renderer = new Renderer(this.canvas);
 
-        // Override GameManager's input handling
-        this.setupInput();
-
         // Initialize game
         this.game.init();
 
@@ -75,36 +69,11 @@ class GameScene extends BaseScene {
         return results;
     }
 
-    setupInput() {
-        // Remove GameManager's default input listeners
-        // and use our own that we can clean up properly
-
-        const handleKeyDown = (e) => {
-            this.keys[e.key] = true;
-            // Pass to game
-            if (this.game) {
-                this.game.keys[e.key] = true;
-            }
-        };
-
-        const handleKeyUp = (e) => {
-            this.keys[e.key] = false;
-            // Pass to game
-            if (this.game) {
-                this.game.keys[e.key] = false;
-            }
-        };
-
-        // Store handlers for cleanup
-        this._handleKeyDown = handleKeyDown;
-        this._handleKeyUp = handleKeyUp;
-
-        window.addEventListener('keydown', this._handleKeyDown);
-        window.addEventListener('keyup', this._handleKeyUp);
-    }
-
     update(deltaTime) {
         if (!this.game) return;
+
+        // Update game with InputManager keys
+        this.game.keys = Input.keys;
 
         // Update based on game phase
         switch (this.game.state.phase) {
@@ -183,19 +152,10 @@ class GameScene extends BaseScene {
             this.game.timers = [];
         }
 
-        // Remove event listeners
-        if (this._handleKeyDown) {
-            window.removeEventListener('keydown', this._handleKeyDown);
-        }
-        if (this._handleKeyUp) {
-            window.removeEventListener('keyup', this._handleKeyUp);
-        }
-
         // Clear references
         this.physics = null;
         this.game = null;
         this.renderer = null;
-        this.keys = {};
     }
 
     destroy() {

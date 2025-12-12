@@ -28,8 +28,6 @@ class SceneManager {
         this.boundHandleMouseDown = this.handleMouseDown.bind(this);
         this.boundHandleMouseMove = this.handleMouseMove.bind(this);
         this.boundHandleMouseUp = this.handleMouseUp.bind(this);
-        this.boundHandleKeyDown = this.handleKeyDown.bind(this);
-        this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         this.boundHandleResize = this.handleResize.bind(this);
 
         // Resize debounce timer
@@ -188,9 +186,10 @@ class SceneManager {
         // Mouse up on window to catch releases outside canvas
         window.addEventListener('mouseup', this.boundHandleMouseUp);
 
-        // Keyboard events
-        window.addEventListener('keydown', this.boundHandleKeyDown);
-        window.addEventListener('keyup', this.boundHandleKeyUp);
+        // Initialize InputManager and subscribe to keyboard events
+        Input.init(this.canvas);
+        Input.subscribe('keydown', (e) => this.handleKeyDown(e));
+        Input.subscribe('keyup', (e) => this.handleKeyUp(e));
 
         // Window resize (with debounce)
         this.boundHandleResizeDebounced = () => {
@@ -315,9 +314,9 @@ class SceneManager {
         this.canvas.removeEventListener('mousedown', this.boundHandleMouseDown);
         this.canvas.removeEventListener('mousemove', this.boundHandleMouseMove);
         window.removeEventListener('mouseup', this.boundHandleMouseUp);
-        window.removeEventListener('keydown', this.boundHandleKeyDown);
-        window.removeEventListener('keyup', this.boundHandleKeyUp);
         window.removeEventListener('resize', this.boundHandleResizeDebounced);
+
+        // InputManager cleanup is handled globally, not per-scene
 
         // Destroy all scenes
         Object.values(this.scenes).forEach(scene => scene.destroy());

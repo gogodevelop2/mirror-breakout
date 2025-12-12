@@ -32,27 +32,27 @@
 
 ---
 
-## Phase 2: 입력 시스템 통합
+## Phase 2: 입력 시스템 통합 ✅
 
 ### InputManager 구현
-- [ ] `js/input-manager.js` 파일 생성
-- [ ] InputManager 클래스 구현
-  - [ ] 키보드 상태 관리 (keys, keysJustPressed, keysJustReleased)
-  - [ ] 마우스 상태 관리
-  - [ ] 이벤트 구독 시스템 (subscribe/unsubscribe)
-  - [ ] `isKeyDown()`, `isKeyJustPressed()` 등 API
-- [ ] Input 싱글톤 인스턴스 생성
+- [x] `js/input-manager.js` 파일 생성
+- [x] InputManager 클래스 구현
+  - [x] 키보드 상태 관리 (keys, keysJustPressed, keysJustReleased)
+  - [x] 마우스 상태 관리
+  - [x] 이벤트 구독 시스템 (subscribe/unsubscribe)
+  - [x] `isKeyDown()`, `isKeyJustPressed()` 등 API
+- [x] Input 싱글톤 인스턴스 생성
 
 ### 기존 코드 수정
-- [ ] SceneManager에서 InputManager 사용
-- [ ] GameScene에서 중복 이벤트 리스너 제거
-- [ ] GameManager에서 Input 직접 사용
-- [ ] index.html에 input-manager.js 추가
+- [x] SceneManager에서 InputManager 사용 (Input.init, Input.subscribe)
+- [x] GameScene에서 중복 이벤트 리스너 제거 (setupInput 메서드 제거)
+- [x] GameManager에서 Input 직접 사용 (Input.isKeyDown)
+- [x] index.html에 input-manager.js 추가
 
 ### 정리
-- [ ] scene-manager.js 키보드 이벤트 코드 제거
-- [ ] game-scene.js 키보드 이벤트 코드 제거
-- [ ] game.js의 this.keys 제거
+- [x] scene-manager.js 키보드 이벤트 코드 제거 (boundHandleKeyDown/Up 제거)
+- [x] game-scene.js 키보드 이벤트 코드 제거 (this.keys, setupInput 제거)
+- [x] game.js this.keys 참조를 Input.isKeyDown()으로 변경
 
 ---
 
@@ -146,7 +146,7 @@
 | Phase | 완료일 | 비고 |
 |-------|--------|------|
 | Phase 1 | 2025-12-12 | Utils 함수 및 렌더링 상수 정리 완료 |
-| Phase 2 | - | |
+| Phase 2 | 2025-12-12 | InputManager 통합, 중복 이벤트 리스너 제거 |
 | Phase 3 | - | |
 | Phase 4 | - | |
 | Phase 5 | - | |
