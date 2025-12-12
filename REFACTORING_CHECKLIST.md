@@ -103,18 +103,22 @@
 
 ---
 
-## Phase 5: 성능 최적화
+## Phase 5: 성능 최적화 ✅
 
 ### 브릭 스폰 최적화
-- [ ] `createOccupancyGrid(bricks)` 메서드 구현
-- [ ] `trySpawnBrick()` O(n²) → O(n) 개선
-- [ ] 브릭 엔티티에 row, col 정보 저장
+- [x] `trySpawnBrick()` 미세 최적화 (forEach → for 루프 + early break)
+- [x] 물리 기반 위치 검사 방식 유지 (주석으로 이유 문서화)
+- ~~`createOccupancyGrid()` 메서드~~ → 게임 메커니즘과 충돌하여 제외
+
+> **참고**: 그리드 기반 점유 맵은 물리 시뮬레이션으로 벽돌이 이동하는
+> 이 게임의 특성과 맞지 않아 적용하지 않음. 현재 물리적 위치 기반 검사가 적합함.
 
 ### 엔티티 조회 캐싱
-- [ ] PhysicsEngine에 `_frameCache` 추가
-- [ ] `invalidateCache()` 메서드 구현
-- [ ] `getEntitiesOfType()` 캐싱 적용
-- [ ] `step()` 시작 시 캐시 무효화
+- [x] PhysicsEngine에 `_entityCache`, `_cacheValid` 추가
+- [x] `invalidateCache()` 메서드 구현
+- [x] `getEntitiesOfType()` 캐싱 적용
+- [x] `step()` 시작 시 캐시 무효화
+- [x] `removeEntity()` 시 캐시 무효화
 
 ---
 
@@ -149,7 +153,7 @@
 | Phase 2 | 2025-12-12 | InputManager 통합, 중복 이벤트 리스너 제거 |
 | Phase 3 | 2025-12-12 | AIController 분리, game.js 경량화 (110줄 축소) |
 | Phase 4 | 2025-12-12 | 렌더링 헬퍼 메서드 추가, 코드 중복 제거 |
-| Phase 5 | - | |
+| Phase 5 | 2025-12-12 | 미세 최적화 + 엔티티 캐싱 (그리드 기반 제외) |
 | Phase 6 | - | 선택적 |
 
 ---

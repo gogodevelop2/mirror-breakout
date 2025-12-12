@@ -402,55 +402,66 @@ class GameManager {
         this.trySpawnBrick(false);  // AI side
     }
     
-    // Try to spawn a single brick
+    /**
+     * Try to spawn a single brick at an empty grid position
+     *
+     * NOTE: 이 게임은 물리 기반 벽돌 시스템을 사용합니다.
+     * 벽돌들은 충돌 시 밀리고 회전하며 원래 그리드 위치에서 벗어납니다.
+     * 따라서 그리드 기반 점유 맵(occupancy grid)이 아닌,
+     * 벽돌의 "현재 물리적 위치"를 기준으로 빈 공간을 찾습니다.
+     *
+     * 예: 벽돌 A가 (row=0, col=5)에서 생성 후 충돌로 (row=1, col=3) 근처로 이동하면,
+     *     원래 위치 (row=0, col=5)는 비어있으므로 새 벽돌을 생성할 수 있어야 합니다.
+     */
     trySpawnBrick(isPlayerTarget) {
-        // Check if we have room (max 60 bricks per side)
-        const existingBricks = this.physics.getEntitiesOfType(isPlayerTarget ? 'playerTargetBrick' : 'aiTargetBrick');
+        const brickType = isPlayerTarget ? 'playerTargetBrick' : 'aiTargetBrick';
+        const existingBricks = this.physics.getEntitiesOfType(brickType);
         const maxBricks = CONFIG.BRICK.ROWS * CONFIG.BRICK.COLS;
         if (existingBricks.length >= maxBricks) return;
-        
+
         // 벽돌 그룹 전체 너비 계산
         const totalBricksWidth = CONFIG.BRICK.COLS * CONFIG.BRICK.WIDTH +
                                  (CONFIG.BRICK.COLS - 1) * CONFIG.BRICK.GAP_X;
-        // 중앙 정렬을 위한 시작 X 위치
         const startX = (CONFIG.WORLD_WIDTH - totalBricksWidth) / 2;
-        
-        // Find empty position
+
+        // Find empty positions by checking current physical positions of bricks
         const emptyPositions = [];
-        
+        const brickCount = existingBricks.length;
+
         for (let row = 0; row < CONFIG.BRICK.ROWS; row++) {
             for (let col = 0; col < CONFIG.BRICK.COLS; col++) {
                 const x = startX + col * (CONFIG.BRICK.WIDTH + CONFIG.BRICK.GAP_X) + CONFIG.BRICK.WIDTH/2;
                 const y = isPlayerTarget
                     ? CONFIG.BRICK.PLAYER_BRICKS_Y + row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2
                     : CONFIG.BRICK.AI_BRICKS_Y - row * (CONFIG.BRICK.HEIGHT + CONFIG.BRICK.GAP_Y) + CONFIG.BRICK.HEIGHT/2;
-                
-                // Check if position is occupied
+
+                // Check if position is occupied (using current physical position)
                 let occupied = false;
-                existingBricks.forEach(brick => {
-                    const brickPos = brick.body.getPosition();
+                for (let i = 0; i < brickCount; i++) {
+                    const brickPos = existingBricks[i].body.getPosition();
                     if (Math.abs(brickPos.x - x) < CONFIG.BRICK.WIDTH * 0.5 &&
                         Math.abs(brickPos.y - y) < CONFIG.BRICK.HEIGHT * 0.5) {
                         occupied = true;
+                        break;  // Early exit when found
                     }
-                });
-                
+                }
+
                 if (!occupied) {
                     emptyPositions.push({ x, y, row, col });
                 }
             }
         }
-        
+
         if (emptyPositions.length > 0) {
             const pos = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
             this.physics.createBrick(pos.x, pos.y, pos.row, pos.col, isPlayerTarget);
-            
+
             // Add spawn effect
             this.effects.spawnEffects.push({
                 x: pos.x,
                 y: pos.y,
                 radius: 0,
-                maxRadius: 0.3,  // in meters
+                maxRadius: 0.3,
                 opacity: 1,
                 color: isPlayerTarget ? CONFIG.COLORS.PLAYER : CONFIG.COLORS.AI_BASE
             });

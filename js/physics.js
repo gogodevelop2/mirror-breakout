@@ -8,6 +8,11 @@ class PhysicsEngine {
         this.nextId = 1;
         this.collisionCallbacks = [];
         this.nextFrameCallbacks = [];  // Callbacks to run after physics step
+
+        // Frame-level cache for entity queries
+        // Reduces redundant iterations when same type is queried multiple times per frame
+        this._entityCache = {};
+        this._cacheValid = false;
     }
     
     // Initialize world
@@ -228,15 +233,40 @@ class PhysicsEngine {
         return this.entities.get(id);
     }
     
-    // Get all entities of type
+    /**
+     * Get all entities of a specific type (with frame-level caching)
+     *
+     * Caching reduces redundant iterations when the same type is queried
+     * multiple times per frame (e.g., 'ball' is queried in updateAI, update, render).
+     * Cache is invalidated at the start of each physics step.
+     */
     getEntitiesOfType(type) {
+        // Return cached result if available
+        if (this._cacheValid && this._entityCache[type]) {
+            return this._entityCache[type];
+        }
+
+        // Build result and cache it
         const result = [];
         for (const entity of this.entities.values()) {
             if (entity.type === type) {
                 result.push(entity);
             }
         }
+
+        this._entityCache[type] = result;
+        this._cacheValid = true;
+
         return result;
+    }
+
+    /**
+     * Invalidate entity cache
+     * Called at the start of each physics step and when entities are added/removed
+     */
+    invalidateCache() {
+        this._cacheValid = false;
+        this._entityCache = {};
     }
     
     // Remove entity
@@ -245,6 +275,7 @@ class PhysicsEngine {
         if (entity) {
             this.world.destroyBody(entity.body);
             this.entities.delete(id);
+            this.invalidateCache();  // Cache is stale after entity removal
         }
     }
     
@@ -402,6 +433,9 @@ class PhysicsEngine {
     // Step physics and process callbacks
     step() {
         if (!this.world) return [];
+
+        // Invalidate entity cache at the start of each physics step
+        this.invalidateCache();
 
         // Sub-stepping: Break down each frame into smaller steps for more accurate collision detection
         // This prevents tunneling and overlap issues with many dynamic rotating bodies
