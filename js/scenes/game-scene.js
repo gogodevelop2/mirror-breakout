@@ -53,12 +53,16 @@ class GameScene extends BaseScene {
     onExit() {
         super.onExit();
 
+        // Calculate final score (승리 시에만)
+        const finalScore = this.game.state.playerWon ? this.game.calculateFinalScore() : null;
+
         // Collect game results
         const results = {
             playerScore: this.game.score.player,
             aiScore: this.game.score.ai,
             gameTime: this.game.state.gameTime,
-            playerWon: this.game.state.playerWon
+            playerWon: this.game.state.playerWon,
+            finalScore: finalScore  // 최종 점수 정보 추가
         };
 
         // Clean up

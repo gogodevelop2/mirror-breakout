@@ -515,6 +515,36 @@ class GameManager {
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 
+    /**
+     * Calculate final score based on performance
+     * Formula: BASE_SCORE + (score difference × multiplier) + (time bonus × multiplier)
+     *
+     * @returns {Object} Score breakdown
+     */
+    calculateFinalScore() {
+        const baseScore = CONFIG.SCORING.BASE_SCORE;
+
+        // Score difference bonus
+        const scoreDiff = Math.abs(this.score.player - this.score.ai);
+        const scoreDiffBonus = scoreDiff * CONFIG.SCORING.SCORE_DIFF_MULTIPLIER;
+
+        // Time bonus (remaining time from target)
+        const remainingTime = Math.max(0, CONFIG.SCORING.TARGET_TIME - this.state.gameTime);
+        const timeBonus = Math.floor(remainingTime * CONFIG.SCORING.TIME_BONUS_MULTIPLIER);
+
+        // Total score
+        const totalScore = baseScore + scoreDiffBonus + timeBonus;
+
+        return {
+            total: totalScore,
+            base: baseScore,
+            scoreDiffBonus: scoreDiffBonus,
+            timeBonus: timeBonus,
+            scoreDiff: scoreDiff,
+            gameTime: this.state.gameTime
+        };
+    }
+
     // AI 색상 접근을 위한 getter
     get aiColor() {
         return this.aiController.color;

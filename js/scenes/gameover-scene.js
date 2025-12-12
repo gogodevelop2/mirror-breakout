@@ -10,7 +10,8 @@ class GameOverScene extends BaseScene {
             playerScore: 0,
             aiScore: 0,
             gameTime: 0,
-            playerWon: false
+            playerWon: false,
+            finalScore: null  // Final score breakdown (승리 시에만)
         };
 
         // Buttons
@@ -57,7 +58,8 @@ class GameOverScene extends BaseScene {
             playerScore: data.playerScore || 0,
             aiScore: data.aiScore || 0,
             gameTime: data.gameTime || 0,
-            playerWon: data.playerWon || false
+            playerWon: data.playerWon || false,
+            finalScore: data.finalScore || null
         };
 
         console.log('[GameOverScene] Results:', this.results);
@@ -92,12 +94,16 @@ class GameOverScene extends BaseScene {
         this.layout = {
             centerX: layout.centerX,
             centerY: layout.centerY,
-            titleY: layout.centerY - ResponsiveLayout.spacing(150),
+            titleY: layout.centerY - ResponsiveLayout.spacing(200),
             titleSize: ResponsiveLayout.fontSize(72),
-            scoreboardY: layout.centerY - ResponsiveLayout.spacing(50),
+            finalScoreY: layout.centerY - ResponsiveLayout.spacing(120),
+            finalScoreSize: ResponsiveLayout.fontSize(60),
+            scoreBreakdownY: layout.centerY - ResponsiveLayout.spacing(70),
+            scoreBreakdownSize: ResponsiveLayout.fontSize(16),
+            scoreboardY: layout.centerY - ResponsiveLayout.spacing(20),
             scoreboardWidth: ResponsiveLayout.widgetSize(400),
             scoreboardHeight: ResponsiveLayout.spacing(40),
-            timeY: layout.centerY + ResponsiveLayout.spacing(100),
+            timeY: layout.centerY + ResponsiveLayout.spacing(60),
             timeSize: ResponsiveLayout.fontSize(24),
             footerY: layout.height - ResponsiveLayout.margin('bottom') / 2,
             footerSize: ResponsiveLayout.fontSize(14)
@@ -146,6 +152,32 @@ class GameOverScene extends BaseScene {
         }
 
         ctx.restore();
+
+        // Final Score (승리 시에만 표시)
+        if (this.results.playerWon && this.results.finalScore) {
+            const fs = this.results.finalScore;
+
+            // Total score (큰 숫자)
+            ctx.fillStyle = '#ffd700';  // Gold color
+            ctx.font = `bold ${this.layout.finalScoreSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = ResponsiveLayout.spacing(15);
+            ctx.fillText(fs.total.toLocaleString(), this.layout.centerX, this.layout.finalScoreY);
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // Score breakdown (작은 글씨)
+            ctx.fillStyle = '#aaa';
+            ctx.font = `${this.layout.scoreBreakdownSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText(
+                `Base: ${fs.base} + Difference: ${fs.scoreDiffBonus} + Time: ${fs.timeBonus}`,
+                this.layout.centerX,
+                this.layout.scoreBreakdownY
+            );
+        }
 
         // Scoreboard (responsive)
         this.renderScoreboard(

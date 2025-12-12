@@ -113,6 +113,14 @@ const CONFIG = {
         INITIAL_COVERAGE: 0.7,  // 70% bricks at start
         MIN_COVERAGE: 0.5       // Minimum 50%
     },
+
+    // Scoring system (Option 1: Bonus addition method)
+    SCORING: {
+        BASE_SCORE: 1000,           // 기본 점수 (승리 시)
+        SCORE_DIFF_MULTIPLIER: 100, // 승점차 보너스 계수
+        TIME_BONUS_MULTIPLIER: 10,  // 시간 보너스 계수
+        TARGET_TIME: 180            // 목표 시간 (초) - 3분
+    },
     
     // Difficulty
     DIFFICULTY: {
