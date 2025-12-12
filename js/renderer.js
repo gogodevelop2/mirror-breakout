@@ -185,7 +185,7 @@ class Renderer {
         // AI paddle (bottom) with difficulty color
         const aiPaddle = physics.getEntity(game.paddleIds.ai);
         if (aiPaddle) {
-            this.drawHexagonPaddle(aiPaddle.body, game.ai.color);
+            this.drawHexagonPaddle(aiPaddle.body, game.aiColor);
         }
     }
     

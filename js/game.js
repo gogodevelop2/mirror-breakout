@@ -22,15 +22,10 @@ class GameManager {
             player: 0,
             ai: 0
         };
-        
-        // AI
-        this.ai = {
-            difficulty: 1.0,
-            color: CONFIG.COLORS.AI_BASE,
-            targetBallId: null,
-            lastDifficultyUpdate: 0
-        };
-        
+
+        // AI Controller
+        this.aiController = new AIController(CONFIG);
+
         // Entity references
         this.paddleIds = {
             player: null,
@@ -76,13 +71,7 @@ class GameManager {
         // Reset paddle velocities
         this.paddleVelocity.player = 0;
         this.paddleVelocity.ai = 0;
-        
-        // Reset AI
-        this.ai.difficulty = 1.0;
-        this.ai.color = CONFIG.COLORS.AI_BASE;
-        this.ai.targetBallId = null;
-        this.ai.lastDifficultyUpdate = 0;
-        
+
         // Clear effects
         this.effects.splitEffect = null;
         this.effects.spawnEffects = [];
@@ -91,6 +80,9 @@ class GameManager {
         this.createPaddles();
         this.createInitialBalls();
         this.createInitialBricks();
+
+        // Initialize AI Controller
+        this.aiController.reset();
     }
     
     // Create paddles
@@ -307,87 +299,9 @@ class GameManager {
     
     // Update AI (AI는 아래쪽에 있으므로 위에서 내려오는 공에 반응)
     updateAI() {
-        const balls = this.physics.getEntitiesOfType('ball');
-        if (balls.length === 0) {
-            // Apply friction to slow down
-            this.paddleVelocity.ai *= CONFIG.PADDLE.AI_FRICTION;
-            this.physics.movePaddle(this.paddleIds.ai, this.paddleVelocity.ai);
-            return;
-        }
-        
-        // Find the most threatening ball to AI's territory (영역 기반 판단)
-        let targetBall = null;
-        let minDistance = Infinity;
-        
-        const aiPaddle = this.physics.getEntity(this.paddleIds.ai);
-        const aiPos = aiPaddle.body.getPosition();
-        
-        balls.forEach(ball => {
-            const ballPos = ball.body.getPosition();
-            const ballVel = ball.body.getLinearVelocity();
-            
-            // AI가 관심을 가져야 하는 공인지 영역 기반으로 판단
-            if (Utils.shouldAITrackBall(ballPos, ballVel)) {
-                const distance = Math.abs(ballPos.y - aiPos.y);
-                
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    targetBall = ball;
-                }
-            }
-        });
-        
-        let targetVelocity = 0;
-        
-        if (targetBall) {
-            const ballX = targetBall.body.getPosition().x;
-            const paddleX = aiPos.x;
-            const diff = ballX - paddleX;
-            
-            // Apply difficulty multiplier
-            const maxSpeed = CONFIG.PADDLE.AI_BASE_SPEED * this.ai.difficulty;
-            const reactionThreshold = 0.05 / this.ai.difficulty;
-            
-            if (Math.abs(diff) > reactionThreshold) {
-                // Set target velocity based on distance
-                targetVelocity = Math.sign(diff) * Math.min(Math.abs(diff) * 6, maxSpeed);
-            }
-        } else {
-            // No threatening ball, move toward center
-            const centerX = CONFIG.WORLD_WIDTH / 2;
-            const paddleX = aiPos.x;
-            const diff = centerX - paddleX;
-            
-            if (Math.abs(diff) > 0.1) {
-                targetVelocity = Math.sign(diff) * Math.min(Math.abs(diff) * 3, CONFIG.PADDLE.AI_BASE_SPEED * 0.5);
-            }
-        }
-        
-        // Apply smooth acceleration to AI paddle
-        if (targetVelocity !== 0) {
-            const diff = targetVelocity - this.paddleVelocity.ai;
-            const accelAmount = Math.sign(diff) * CONFIG.PADDLE.ACCELERATION * 1.2; // AI is slightly more responsive
-            
-            if (Math.abs(diff) < CONFIG.PADDLE.ACCELERATION) {
-                this.paddleVelocity.ai = targetVelocity;
-            } else {
-                this.paddleVelocity.ai += accelAmount;
-            }
-        } else {
-            // Apply friction
-            this.paddleVelocity.ai *= CONFIG.PADDLE.AI_FRICTION;
-            
-            if (Math.abs(this.paddleVelocity.ai) < 0.1) {
-                this.paddleVelocity.ai = 0;
-            }
-        }
-        
-        // Clamp to max speed
-        const maxSpeed = CONFIG.PADDLE.AI_BASE_SPEED * this.ai.difficulty;
-        this.paddleVelocity.ai = Utils.clampSymmetric(this.paddleVelocity.ai, maxSpeed);
-        
-        // Apply velocity
-        this.physics.movePaddle(this.paddleIds.ai, this.paddleVelocity.ai);
+        const velocity = this.aiController.update(this.physics, this.paddleIds.ai);
+        this.paddleVelocity.ai = velocity;
+        this.physics.movePaddle(this.paddleIds.ai, velocity);
     }
     
     // Process collision events
@@ -545,38 +459,9 @@ class GameManager {
     
     // Update difficulty based on brick difference
     updateDifficulty() {
-        const now = Date.now();
-        if (now - this.ai.lastDifficultyUpdate < CONFIG.DIFFICULTY.UPDATE_INTERVAL) return;
-        
-        this.ai.lastDifficultyUpdate = now;
-        
-        const playerTargetBricks = this.physics.getEntitiesOfType('playerTargetBrick').length;
-        const aiTargetBricks = this.physics.getEntitiesOfType('aiTargetBrick').length;
-        
-        // 남은 타겟 벽돌이 적을수록 우세
-        const diff = aiTargetBricks - playerTargetBricks;
-        
-        let targetDifficulty = 1.0;
-        
-        if (diff > 0) {
-            // AI가 지고 있음 (AI 타겟이 더 많이 남음), 난이도 증가
-            targetDifficulty = Math.min(
-                CONFIG.DIFFICULTY.MAX,
-                1.0 + diff * CONFIG.DIFFICULTY.INCREASE_RATE
-            );
-        } else if (diff < 0) {
-            // AI가 이기고 있음 (Player 타겟이 더 많이 남음), 난이도 감소
-            targetDifficulty = Math.max(
-                CONFIG.DIFFICULTY.MIN,
-                1.0 + diff * CONFIG.DIFFICULTY.DECREASE_RATE
-            );
-        }
-        
-        // Smooth transition using lerp
-        this.ai.difficulty = this.ai.difficulty + (targetDifficulty - this.ai.difficulty) * CONFIG.DIFFICULTY.LERP_FACTOR;
-        
-        // Update AI paddle color
-        this.ai.color = Utils.getAIDifficultyColor(this.ai.difficulty);
+        const playerBricks = this.physics.getEntitiesOfType('playerTargetBrick').length;
+        const aiBricks = this.physics.getEntitiesOfType('aiTargetBrick').length;
+        this.aiController.updateDifficulty(playerBricks, aiBricks);
     }
     
     // Update visual effects
@@ -617,5 +502,15 @@ class GameManager {
         const minutes = Math.floor(this.state.gameTime / 60);
         const seconds = Math.floor(this.state.gameTime % 60);
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // AI 색상 접근을 위한 getter
+    get aiColor() {
+        return this.aiController.color;
+    }
+
+    // AI 난이도 접근을 위한 getter
+    get aiDifficulty() {
+        return this.aiController.difficulty;
     }
 }

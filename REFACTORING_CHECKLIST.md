@@ -56,30 +56,30 @@
 
 ---
 
-## Phase 3: AI 시스템 분리
+## Phase 3: AI 시스템 분리 ✅
 
 ### AIController 구현
-- [ ] `js/ai-controller.js` 파일 생성
-- [ ] AIController 클래스 구현
-  - [ ] `reset()` - 상태 초기화
-  - [ ] `selectTargetBall()` - 추적 대상 선택
-  - [ ] `calculateTargetVelocity()` - 목표 속도 계산
-  - [ ] `updateVelocity()` - 가속도 적용
-  - [ ] `updateDifficulty()` - 난이도 조절
-  - [ ] `update()` - 통합 업데이트
+- [x] `js/ai-controller.js` 파일 생성
+- [x] AIController 클래스 구현
+  - [x] `reset()` - 상태 초기화
+  - [x] `selectTargetBall()` - 추적 대상 선택
+  - [x] `calculateTargetVelocity()` - 목표 속도 계산
+  - [x] `updateVelocity()` - 가속도 적용
+  - [x] `updateDifficulty()` - 난이도 조절
+  - [x] `update()` - 통합 업데이트
 
 ### GameManager 수정
-- [ ] AIController 인스턴스 생성
-- [ ] `updateAI()` 메서드 간소화
-- [ ] `updateDifficulty()` 메서드 간소화
-- [ ] `aiColor`, `aiDifficulty` getter 추가
-- [ ] 기존 AI 관련 코드 제거 (this.ai 객체 등)
+- [x] AIController 인스턴스 생성 (this.aiController)
+- [x] `updateAI()` 메서드 간소화 (80줄 → 3줄)
+- [x] `updateDifficulty()` 메서드 간소화 (30줄 → 3줄)
+- [x] `aiColor`, `aiDifficulty` getter 추가
+- [x] 기존 AI 관련 코드 제거 (this.ai 객체 → this.aiController)
 
 ### Renderer 수정
-- [ ] AI 패들 색상 접근 방식 수정 (game.aiColor 사용)
+- [x] AI 패들 색상 접근 방식 수정 (game.ai.color → game.aiColor)
 
 ### 정리
-- [ ] index.html에 ai-controller.js 추가
+- [x] index.html에 ai-controller.js 추가
 
 ---
 
@@ -147,7 +147,7 @@
 |-------|--------|------|
 | Phase 1 | 2025-12-12 | Utils 함수 및 렌더링 상수 정리 완료 |
 | Phase 2 | 2025-12-12 | InputManager 통합, 중복 이벤트 리스너 제거 |
-| Phase 3 | - | |
+| Phase 3 | 2025-12-12 | AIController 분리, game.js 경량화 (110줄 축소) |
 | Phase 4 | - | |
 | Phase 5 | - | |
 | Phase 6 | - | 선택적 |
