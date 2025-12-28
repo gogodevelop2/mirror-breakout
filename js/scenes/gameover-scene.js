@@ -38,6 +38,13 @@ class GameOverScene extends BaseScene {
             newEntryBlink: 0
         };
 
+        // Network state (Supabase)
+        this.networkState = {
+            submitting: false,
+            error: null,
+            globalRank: -1
+        };
+
         // Buttons
         this.buttons = {
             retry: {
@@ -93,7 +100,59 @@ class GameOverScene extends BaseScene {
             this.phase = 'HIGHSCORE_TABLE';
         }
 
+        // Supabase 사용 가능 여부 체크
+        if (!HighScore.isAvailable()) {
+            console.warn('[GameOverScene] Supabase not available');
+            this.networkState.error = '네트워크 연결이 필요합니다';
+        } else {
+            this.networkState.error = null;
+        }
+
+        // 최신 글로벌 점수 가져오기 (비동기, UI 블로킹 없음)
+        this.refreshLeaderboard();
+
         this.updateLayout();
+    }
+
+    /**
+     * 백그라운드에서 최신 리더보드 가져오기
+     */
+    async refreshLeaderboard() {
+        try {
+            await HighScore.fetchGlobalScores();
+            console.log('[GameOverScene] Leaderboard refreshed');
+        } catch (error) {
+            console.error('[GameOverScene] Failed to refresh leaderboard:', error);
+            // 캐시된 점수라도 표시 (에러는 이미 HighScore에 저장됨)
+        }
+    }
+
+    /**
+     * 점수 제출 (Supabase)
+     */
+    async submitScore(name, score, breakdown) {
+        if (!HighScore.isAvailable()) {
+            this.networkState.error = '네트워크 연결이 필요합니다';
+            throw new Error(this.networkState.error);
+        }
+
+        this.networkState.submitting = true;
+        this.networkState.error = null;
+
+        try {
+            // Supabase에 제출
+            const rank = await HighScore.submitScore(name, score, breakdown);
+            this.networkState.globalRank = rank;
+            this.networkState.submitting = false;
+            console.log('[GameOverScene] Score submitted, rank:', rank);
+            return rank;
+
+        } catch (error) {
+            console.error('[GameOverScene] Failed to submit score:', error);
+            this.networkState.error = '점수 제출에 실패했습니다';
+            this.networkState.submitting = false;
+            throw error;
+        }
     }
 
     updateLayout() {
@@ -377,7 +436,27 @@ class GameOverScene extends BaseScene {
         ctx.font = `bold ${ResponsiveLayout.fontSize(36)}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('HIGH SCORES', centerX, centerY - ResponsiveLayout.spacing(200));
+        ctx.fillText('GLOBAL HIGH SCORES', centerX, centerY - ResponsiveLayout.spacing(200));
+
+        // 로딩/에러 상태 표시
+        const statusY = centerY - ResponsiveLayout.spacing(160);
+        if (this.networkState.submitting) {
+            ctx.fillStyle = '#888';
+            ctx.font = `${ResponsiveLayout.fontSize(14)}px monospace`;
+            ctx.fillText('Submitting score...', centerX, statusY);
+        } else if (HighScore.isLoading()) {
+            ctx.fillStyle = '#888';
+            ctx.font = `${ResponsiveLayout.fontSize(14)}px monospace`;
+            ctx.fillText('Loading leaderboard...', centerX, statusY);
+        } else if (this.networkState.error) {
+            ctx.fillStyle = '#f44';
+            ctx.font = `${ResponsiveLayout.fontSize(12)}px monospace`;
+            ctx.fillText(`⚠ ${this.networkState.error}`, centerX, statusY);
+        } else if (HighScore.getError()) {
+            ctx.fillStyle = '#f80';
+            ctx.font = `${ResponsiveLayout.fontSize(12)}px monospace`;
+            ctx.fillText('⚠ 네트워크 오류 (캐시된 데이터 표시 중)', centerX, statusY);
+        }
 
         // Table header
         const tableY = centerY - ResponsiveLayout.spacing(140);
@@ -479,7 +558,18 @@ class GameOverScene extends BaseScene {
             // Enter - submit
             else if (event.key === 'Enter' && this.nameInput.name.length === 3) {
                 const fs = this.results.finalScore;
-                HighScore.addScore(this.nameInput.name, fs.total, fs);
+
+                // 비동기 제출
+                this.submitScore(this.nameInput.name, fs.total, fs)
+                    .then(rank => {
+                        console.log('[GameOverScene] Score submitted successfully, rank:', rank);
+                    })
+                    .catch(error => {
+                        console.error('[GameOverScene] Submit failed:', error);
+                        // 에러는 networkState에 저장되어 UI에 표시됨
+                    });
+
+                // 즉시 하이스코어 테이블로 전환 (제출 결과를 기다리지 않음)
                 this.phase = 'HIGHSCORE_TABLE';
                 this.phaseTime = 0;
             }
