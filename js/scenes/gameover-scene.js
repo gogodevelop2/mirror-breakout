@@ -389,42 +389,42 @@ class GameOverScene extends BaseScene {
         ctx.font = `${ResponsiveLayout.fontSize(18)}px monospace`;
         ctx.fillText('ENTER YOUR NAME', centerX, centerY);
 
-        // Name input boxes
-        const boxSize = ResponsiveLayout.spacing(60);
-        const boxGap = ResponsiveLayout.spacing(20);
-        const totalWidth = boxSize * 3 + boxGap * 2;
-        const startX = centerX - totalWidth / 2;
+        // Name input box (single long box for up to 10 characters)
+        const boxWidth = ResponsiveLayout.spacing(400);
+        const boxHeight = ResponsiveLayout.spacing(60);
+        const boxX = centerX - boxWidth / 2;
         const boxY = centerY + ResponsiveLayout.spacing(50);
 
-        for (let i = 0; i < 3; i++) {
-            const x = startX + i * (boxSize + boxGap);
+        // Box
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = ResponsiveLayout.borderWidth(3);
+        ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
-            // Box
-            ctx.strokeStyle = '#ffd700';
-            ctx.lineWidth = ResponsiveLayout.borderWidth(3);
-            ctx.strokeRect(x, boxY, boxSize, boxSize);
+        // Name text
+        if (this.nameInput.name) {
+            ctx.fillStyle = '#ffd700';
+            ctx.font = `bold ${ResponsiveLayout.fontSize(32)}px monospace`;
+            ctx.textAlign = 'left';
+            ctx.fillText(this.nameInput.name, boxX + ResponsiveLayout.spacing(15), boxY + boxHeight / 2);
+        }
 
-            // Letter
-            const letter = this.nameInput.name[i] || '';
-            if (letter) {
-                ctx.fillStyle = '#ffd700';
-                ctx.font = `bold ${ResponsiveLayout.fontSize(40)}px monospace`;
-                ctx.textAlign = 'center';
-                ctx.fillText(letter, x + boxSize / 2, boxY + boxSize / 2);
-            } else if (i === this.nameInput.name.length) {
-                // Cursor blink
-                if (Math.floor(this.nameInput.cursorBlink * 3) % 2 === 0) {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.fillRect(x + boxSize / 2 - 2, boxY + boxSize / 2 - ResponsiveLayout.spacing(15), ResponsiveLayout.borderWidth(4), ResponsiveLayout.spacing(30));
-                }
-            }
+        // Cursor blink
+        if (Math.floor(this.nameInput.cursorBlink * 3) % 2 === 0) {
+            const textWidth = ctx.measureText(this.nameInput.name).width;
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(
+                boxX + ResponsiveLayout.spacing(15) + textWidth + ResponsiveLayout.spacing(5),
+                boxY + boxHeight / 2 - ResponsiveLayout.spacing(15),
+                ResponsiveLayout.borderWidth(4),
+                ResponsiveLayout.spacing(30)
+            );
         }
 
         // Instructions
         ctx.fillStyle = '#666';
         ctx.font = `${ResponsiveLayout.fontSize(14)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('USE A-Z KEYS | BACKSPACE TO DELETE | ENTER TO CONFIRM', centerX, boxY + boxSize + ResponsiveLayout.spacing(40));
+        ctx.fillText(`USE A-Z KEYS | BACKSPACE TO DELETE | ENTER TO CONFIRM (${this.nameInput.name.length}/10)`, centerX, boxY + boxHeight + ResponsiveLayout.spacing(40));
     }
 
     renderHighScoreTable(ctx) {
@@ -458,19 +458,31 @@ class GameOverScene extends BaseScene {
             ctx.fillText('⚠ 네트워크 오류 (캐시된 데이터 표시 중)', centerX, statusY);
         }
 
+        // Calculate table width based on button layout
+        const btnSize = ResponsiveLayout.buttonSize(180, 60);
+        const gap = ResponsiveLayout.spacing(20);
+        const totalWidth = btnSize.width * 2 + gap;
+        const tableLeft = centerX - totalWidth / 2;
+        const tableRight = centerX + totalWidth / 2;
+
         // Table header
         const tableY = centerY - ResponsiveLayout.spacing(140);
         const lineHeight = ResponsiveLayout.spacing(30);
         const fontSize = ResponsiveLayout.fontSize(16);
 
+        // Column positions aligned with button width
+        // Distribute columns proportionally: RANK (0%), NAME (30%), SCORE (100%)
+        const rankX = tableLeft;
+        const nameX = tableLeft + totalWidth * 0.3;
+        const scoreX = tableRight;
+
         ctx.fillStyle = '#888';
         ctx.font = `${fontSize}px monospace`;
         ctx.textAlign = 'left';
-        ctx.fillText('RANK', centerX - ResponsiveLayout.spacing(180), tableY);
-        ctx.textAlign = 'center';
-        ctx.fillText('NAME', centerX - ResponsiveLayout.spacing(40), tableY);
+        ctx.fillText('RANK', rankX, tableY);
+        ctx.fillText('NAME', nameX, tableY);
         ctx.textAlign = 'right';
-        ctx.fillText('SCORE', centerX + ResponsiveLayout.spacing(180), tableY);
+        ctx.fillText('SCORE', scoreX, tableY);
 
         // Scores
         const scores = HighScore.getScores();
@@ -490,25 +502,23 @@ class GameOverScene extends BaseScene {
 
                 // Rank
                 ctx.textAlign = 'left';
-                ctx.fillText(`${i + 1}.`, centerX - ResponsiveLayout.spacing(180), y);
+                ctx.fillText(`${i + 1}.`, rankX, y);
 
-                // Name
-                ctx.textAlign = 'center';
-                ctx.fillText(entry.name, centerX - ResponsiveLayout.spacing(40), y);
+                // Name (left-aligned, max 10 characters)
+                ctx.fillText(entry.name.substring(0, 10), nameX, y);
 
                 // Score
                 ctx.textAlign = 'right';
-                ctx.fillText(entry.score.toLocaleString(), centerX + ResponsiveLayout.spacing(180), y);
+                ctx.fillText(entry.score.toLocaleString(), scoreX, y);
             } else {
                 // Empty slot
                 ctx.fillStyle = '#333';
                 ctx.font = `${fontSize}px monospace`;
                 ctx.textAlign = 'left';
-                ctx.fillText(`${i + 1}.`, centerX - ResponsiveLayout.spacing(180), y);
-                ctx.textAlign = 'center';
-                ctx.fillText('---', centerX - ResponsiveLayout.spacing(40), y);
+                ctx.fillText(`${i + 1}.`, rankX, y);
+                ctx.fillText('---', nameX, y);
                 ctx.textAlign = 'right';
-                ctx.fillText('---', centerX + ResponsiveLayout.spacing(180), y);
+                ctx.fillText('---', scoreX, y);
             }
         }
 
@@ -547,16 +557,20 @@ class GameOverScene extends BaseScene {
         if (this.phase === 'NAME_INPUT') {
             const key = event.key.toUpperCase();
 
-            // Letter keys
-            if (key.length === 1 && key >= 'A' && key <= 'Z' && this.nameInput.name.length < 3) {
+            // Letter keys (A-Z and space)
+            if (key.length === 1 && key >= 'A' && key <= 'Z' && this.nameInput.name.length < 10) {
                 this.nameInput.name += key;
+            }
+            // Space key
+            else if (event.key === ' ' && this.nameInput.name.length < 10) {
+                this.nameInput.name += ' ';
             }
             // Backspace
             else if (event.key === 'Backspace' && this.nameInput.name.length > 0) {
                 this.nameInput.name = this.nameInput.name.slice(0, -1);
             }
-            // Enter - submit
-            else if (event.key === 'Enter' && this.nameInput.name.length === 3) {
+            // Enter - submit (allow any length from 1 to 10)
+            else if (event.key === 'Enter' && this.nameInput.name.length >= 1 && this.nameInput.name.length <= 10) {
                 const fs = this.results.finalScore;
 
                 // 비동기 제출

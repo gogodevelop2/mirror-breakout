@@ -98,7 +98,7 @@ class HighScoreManager {
 
     /**
      * Supabase에 점수 제출
-     * @param {string} name - 플레이어 이름 (3글자)
+     * @param {string} name - 플레이어 이름 (1-10글자)
      * @param {number} score - 총점
      * @param {Object} breakdown - 점수 상세 정보
      * @returns {Promise<number>} 달성한 순위 (1-10, 또는 -1)

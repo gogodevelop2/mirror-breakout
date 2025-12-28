@@ -95,7 +95,7 @@ class SupabaseClient {
 
     /**
      * 점수 제출
-     * @param {string} name - 플레이어 이름 (3글자)
+     * @param {string} name - 플레이어 이름 (1-10글자)
      * @param {number} score - 총점
      * @param {Object} breakdown - 점수 상세 정보
      * @returns {Promise<Object>} 제출된 점수 데이터
@@ -107,8 +107,8 @@ class SupabaseClient {
 
         const url = `${this.SUPABASE_URL}/rest/v1/high_scores`;
 
-        // 이름 정규화 (대문자, 3글자, 부족하면 _ 로 채움)
-        const normalizedName = name.toUpperCase().substring(0, 3).padEnd(3, '_');
+        // 이름 정규화 (대문자, 최대 10글자)
+        const normalizedName = name.toUpperCase().substring(0, 10);
 
         const payload = {
             player_name: normalizedName,
