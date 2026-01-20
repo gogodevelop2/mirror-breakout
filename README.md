@@ -4,6 +4,10 @@
 
 An innovative breakout game using physics engine. Players and AI compete to destroy all their respective bricks.
 
+🎮 **플레이**: https://gogodevelop2.github.io/mirror-breakout/
+
+📦 **저장소**: https://github.com/gogodevelop2/mirror-breakout
+
 ## 게임 특징
 
 - **대칭적 게임플레이**: 상하 대칭 구조로 플레이어(위)와 AI(아래)가 경쟁
@@ -14,6 +18,8 @@ An innovative breakout game using physics engine. Players and AI compete to dest
 - **실시간 벽돌 생성**: 게임 진행 중 새로운 벽돌이 랜덤하게 생성
 - **볼 분할 시스템**: 10초 후 우세한 쪽의 볼이 자동으로 분할되어 게임 속도 증가
 - **랜덤 발사 각도**: 매 게임마다 ±30° 랜덤 변화로 다른 패턴 생성
+- **글로벌 리더보드**: Supabase 기반 전 세계 플레이어와 점수 경쟁
+- **점수 시스템**: 기본 점수 + 점수차 보너스 + 시간 보너스로 최종 점수 계산
 
 ## 게임 규칙
 
@@ -24,6 +30,7 @@ An innovative breakout game using physics engine. Players and AI compete to dest
 
 ### 조작법
 - **← / →**: 패들 이동 (가속도 시스템 적용)
+- **ESC**: 게임 종료 (메뉴로 돌아가기)
 
 ### 게임 시스템
 1. **카운트다운**: 게임 시작 전 3초 카운트다운
@@ -37,21 +44,35 @@ An innovative breakout game using physics engine. Players and AI compete to dest
 - **Planck.js**: 2D 물리 엔진
 - **JavaScript ES6+**: 게임 로직 구현
 - **CSS3**: 스타일링 및 레이아웃
+- **Supabase**: 글로벌 리더보드 백엔드
 
 ## 파일 구조
 
 ```
-game-test01/
-├── index.html          # 메인 HTML 파일
+mirror-breakout/
+├── index.html              # 메인 HTML 파일
 ├── css/
-│   └── styles.css      # 게임 스타일 (반응형 레이아웃)
+│   └── styles.css          # 게임 스타일 (반응형 레이아웃)
 ├── js/
-│   ├── config.js       # 게임 설정 (동적 캔버스 계산)
-│   ├── physics.js      # 물리 엔진 래퍼 (Planck.js)
-│   ├── game.js         # 게임 로직 및 상태 관리
-│   ├── renderer.js     # 렌더링 시스템 (반응형)
-│   ├── ui-controls.js  # 물리 설정 UI 컨트롤
-│   └── main.js         # 메인 게임 루프
+│   ├── config.js           # 게임 설정 (동적 캔버스 계산)
+│   ├── physics.js          # 물리 엔진 래퍼 (Planck.js)
+│   ├── game.js             # 게임 로직 및 상태 관리
+│   ├── renderer.js         # 렌더링 시스템 (보간 지원)
+│   ├── main.js             # 메인 게임 루프
+│   ├── ai-controller.js    # AI 패들 제어
+│   ├── input-manager.js    # 키보드/마우스 입력 관리
+│   ├── responsive-layout.js # 반응형 레이아웃 시스템
+│   ├── ui-controls.js      # 물리 설정 UI 컨트롤
+│   ├── highscore-manager.js # 하이스코어 관리
+│   ├── supabase-config.js  # Supabase 설정
+│   ├── supabase-client.js  # Supabase 클라이언트
+│   └── scenes/             # Scene 시스템
+│       ├── base-scene.js       # 기본 Scene 클래스
+│       ├── scene-manager.js    # Scene 전환 관리
+│       ├── menu-scene.js       # 메인 메뉴
+│       ├── game-scene.js       # 게임 플레이
+│       ├── gameover-scene.js   # 게임 오버 / 하이스코어
+│       └── settings-scene.js   # 설정 화면
 └── README.md
 ```
 
@@ -107,29 +128,6 @@ game-test01/
 ### 저작권
 © 2025 Mirror Breakout. All rights reserved.
 
-**저작권으로 보호되는 독창적 요소**:
-
-1. **핵심 게임 메커니즘** (영업 비밀/특허 가능):
-   - **물리적 공유 공간**: 상하 대칭으로 연결된 하나의 물리 공간을 두 플레이어가 공유하며 대결하는 구조 (현재는 플레이어 vs AI, 향후 멀티플레이어 확장 가능)
-   - **동적 긴장감 시스템**: 3개의 공이 만들어내는 복잡성과 우연성이 게임 균형을 지속적으로 변화시켜, 긴장감 있는 게임 진행을 유도하는 메커니즘
-   - **영역 기반 AI 추적**: 공의 방향과 위치로 추적 대상을 결정하는 알고리즘
-
-2. **기술적 구현** (저작권 자동 보호):
-   - 모든 JavaScript 소스 코드
-   - 동적 벽돌 물리 시스템 (질량/회전/충돌 알고리즘)
-   - 반응형 캔버스 시스템 (동적 SCALE 계산)
-   - 실시간 물리 조절 UI 시스템
-   - Box2D/Planck.js 통합 방식
-
-3. **시각적 요소** (저작권 보호):
-   - 육각형 패들 디자인
-   - 색상 스킴 및 그라디언트
-   - UI 레이아웃 및 애니메이션
-
-**브레이크아웃 장르 자체는 공공 영역**이며, 본 게임의 독창적인 메커니즘과 구현만 보호됩니다.
-
-상업적 사용을 원하시는 경우 별도로 연락해 주세요.
-
 ## 개발자 정보
 
 이 게임은 물리 엔진과 게임 AI의 학습 목적으로 제작되었습니다.
@@ -148,6 +146,8 @@ game-test01/
 - **Real-time Brick Generation**: New bricks randomly spawn during gameplay
 - **Ball Split System**: Ball automatically splits after 10 seconds to increase game pace
 - **Random Launch Angles**: ±30° random variation creates different patterns each game
+- **Global Leaderboard**: Compete with players worldwide via Supabase backend
+- **Scoring System**: Final score = Base score + Score difference bonus + Time bonus
 
 ## Game Rules
 
@@ -158,6 +158,7 @@ game-test01/
 
 ### Controls
 - **← / →**: Move paddle (with acceleration system)
+- **ESC**: Exit game (return to menu)
 
 ### Game Systems
 1. **Countdown**: 3-second countdown before game starts
@@ -171,6 +172,7 @@ game-test01/
 - **Planck.js**: 2D physics engine
 - **JavaScript ES6+**: Game logic implementation
 - **CSS3**: Styling and layout
+- **Supabase**: Global leaderboard backend
 
 ## How to Run
 
@@ -201,29 +203,6 @@ This project is licensed under the [Creative Commons Attribution-NonCommercial 4
 
 ### Copyright
 © 2025 Mirror Breakout. All rights reserved.
-
-**Copyrighted Original Elements**:
-
-1. **Core Game Mechanisms** (Trade Secret/Patentable):
-   - **Physical Shared Space**: Structure where two players compete while sharing one vertically symmetric physical space (currently Player vs AI, expandable to multiplayer)
-   - **Dynamic Tension System**: Mechanism that uses complexity and randomness created by 3 balls to continuously change game balance, inducing engaging gameplay
-   - **Zone-based AI Tracking**: Algorithm that determines tracking targets based on ball direction and position
-
-2. **Technical Implementation** (Automatically Copyrighted):
-   - All JavaScript source code
-   - Dynamic brick physics system (mass/rotation/collision algorithms)
-   - Responsive canvas system (dynamic SCALE calculation)
-   - Real-time physics adjustment UI system
-   - Box2D/Planck.js integration approach
-
-3. **Visual Elements** (Copyrighted):
-   - Hexagonal paddle design
-   - Color schemes and gradients
-   - UI layout and animations
-
-**The breakout game genre itself is in the public domain**; only the original mechanisms and implementation of this game are protected.
-
-For commercial use, please contact separately.
 
 ## Developer Info
 
