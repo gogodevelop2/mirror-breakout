@@ -10,6 +10,9 @@ class GameScene extends BaseScene {
         this.game = null;
         this.renderer = null;
 
+        // Local key state (used by scene-level handlers)
+        this.keys = {};
+
         // Callbacks
         this.onGameOver = null;
 

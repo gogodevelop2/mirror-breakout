@@ -77,7 +77,7 @@ const CONFIG = {
         PLAYER_SPEED: 6,   // 6 m/s = 600 px/s (최대 속도)
         AI_BASE_SPEED: 7,  // 7 m/s = 700 px/s
         ACCELERATION: 0.6, // 가속도 (m/s² per frame)
-        FRICTION: 0.88,    // 마찰 계수 (12% 감속)
+        FRICTION: 0.5,     // 마찰 계수 (50% 감속)
         AI_FRICTION: 0.9,  // AI 마찰 계수
         MOMENTUM_TRANSFER: 0.2 // 패들 속도의 20%가 공에 전달
     },
